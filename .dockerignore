@@ -17,3 +17,6 @@ test-results
 docs
 README.md
 screenshots
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm

@@ -7,18 +7,26 @@ services:
       dockerfile: Dockerfile.api
     restart: unless-stopped
     init: true
+    # Allow the bounded background refresh to finish and close SQLite cleanly.
+    stop_grace_period: 35s
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3001"
-      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:3001}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       UPSTREAM_TIMEOUT_MS: ${UPSTREAM_TIMEOUT_MS:-8000}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-300}
+      DB_PATH: /data/hnd.sqlite
+      OBSERVATION_RETENTION_DAYS: ${OBSERVATION_RETENTION_DAYS:-90}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
     # Coolify routes to this internal port; publish host ports only with compose.local.yaml.
     expose:
       - "3001"
     read_only: true
+    volumes:
+      - hnd-data:/data
     tmpfs:
       - /tmp:size=32m,mode=1777
     cap_drop:
@@ -42,7 +50,7 @@ services:
       context: .
       dockerfile: Dockerfile.web
       args:
-        VITE_PUBLIC_API_URL: ${VITE_PUBLIC_API_URL:-http://localhost:3001}
+        VITE_PUBLIC_API_URL: ${VITE_PUBLIC_API_URL:-}
     restart: unless-stopped
     init: true
     depends_on:
@@ -69,3 +77,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  hnd-data:

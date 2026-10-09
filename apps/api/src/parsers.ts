@@ -11,7 +11,7 @@ export function number(value: unknown): number | null {
   if (
     value === null ||
     value === undefined ||
-    value === "" ||
+    (typeof value === "string" && value.trim() === "") ||
     typeof value === "boolean"
   )
     return null;
@@ -65,7 +65,7 @@ export function freshness(
 ): Station["freshness"] {
   return !measurement
     ? "unavailable"
-    : now - Date.parse(measurement.timestamp) > 2 * 60 * 60 * 1000 ||
+    : !Number.isFinite(Date.parse(measurement.timestamp)) || now - Date.parse(measurement.timestamp) > 2 * 60 * 60 * 1000 ||
         Date.parse(measurement.timestamp) > now + 5 * 60_000
       ? "stale"
       : "current";
@@ -113,6 +113,9 @@ export function parsePegelStations(
       : null;
     result.push({
       id,
+      sourceStationNumber: string(item.number) || undefined,
+      measurementSourceId: id,
+      historyAvailable: !!w,
       name,
       water:
         string(record(item.water).longname) ||
@@ -338,6 +341,8 @@ export function parseLhpStations(
     return [
       {
         id,
+        sourceStationNumber: id.replace(/^[A-Z]{2}_/, ""),
+        historyAvailable: false,
         name,
         water: string(props.water),
         latitude: lat,

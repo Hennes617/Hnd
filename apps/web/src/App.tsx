@@ -47,7 +47,7 @@ import {
   SourceCard,
   SourceLink,
 } from "./components/ui";
-import { ReservoirCards } from "./components/ReservoirCards";
+import { ReservoirCards, reservoirObservation } from "./components/ReservoirCards";
 import DetailPanel from "./components/DetailPanel";
 import ForecastPanel from "./components/ForecastPanel";
 const navigation = [
@@ -109,7 +109,7 @@ export default function App() {
         const data = (await r.json()) as Snapshot;
         if (!Array.isArray(data.stations) || !Array.isArray(data.rivers))
           throw new Error("Ungültige Daten");
-        setSnapshot(data);
+        if (!controller.signal.aborted) setSnapshot(data);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -148,19 +148,28 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
   useEffect(() => setStationLimit(75), [query, region]);
+  useEffect(() => {
+    if (!selection || view !== "overview") return;
+    const frame = requestAnimationFrame(() => {
+      const panel = document.getElementById("selection-detail");
+      panel?.focus({ preventScroll: true });
+      panel?.scrollIntoView({ block: window.innerWidth <= 760 ? "start" : "nearest", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selection?.id, selection?.type, view]);
   const navigate = (next: View) => {
     setView(next);
     setMobileMenu(false);
     setBasin("all");
     setQuery("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setSelection(null);
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
   const select = (next: Selection) => {
     setSelection(next);
     setView("overview");
     setQuery("");
     setSearchFocused(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const search = query.trim().toLocaleLowerCase("de");
   const filteredRivers = useMemo(
@@ -203,9 +212,13 @@ export default function App() {
   const classified = snapshot.stations.filter(
     (s) => s.warningLevel !== undefined && s.warningLevel >= 0,
   ).length;
+  const observedReservoirs = snapshot.reservoirs.filter(reservoirObservation).length;
   const liveProviders = snapshot.providers.filter(
     (p) => p.state === "live" || (p.state === "cached" && !p.stale),
   ).length;
+  const sourceIssues = snapshot.providers.filter(
+    (provider) => provider.state === "unavailable" || provider.stale,
+  );
   const searchResults = search
     ? [
         ...filteredStations.slice(0, 3).map((s) => ({
@@ -234,7 +247,7 @@ export default function App() {
   > = {
     overview: {
       eyebrow: REGIONS[region].label.toLocaleUpperCase("de"),
-      title: "Wasser im Blick.",
+      title: "Wasserlage beobachten.",
       description:
         region === "harz"
           ? "Von der Bode bis zur Ilse. Pegel, Flüsse und Talsperren im Landkreis Harz – vom Oberharz bis ins Vorland."
@@ -244,25 +257,25 @@ export default function App() {
     },
     stations: {
       eyebrow: "MESSEN & BEOBACHTEN",
-      title: "Jeder Pegel erzählt.",
+      title: "Pegel & Messwerte",
       description:
         "Wasserstände und amtliche Einstufungen aus verfügbaren Datenquellen. Zeitstempel und Herkunft bleiben immer sichtbar.",
     },
     rivers: {
       eyebrow: "VON DER QUELLE BIS ZUR MÜNDUNG",
-      title: "Alles ist im Fluss.",
+      title: "Das Gewässernetz",
       description:
         "Flüsse in der gewählten Region, ihre Ursprünge und ihre Wege bis zur Mündung. Ein wachsendes Verzeichnis der Wasserlandschaft.",
     },
     reservoirs: {
       eyebrow: "WASSER IN DER LANDSCHAFT",
-      title: "Raum für Wasser.",
+      title: "Talsperren & Speicher",
       description:
-        "Trinkwasserspeicher, Rückhalteräume und Landschaften. Entdecke die Talsperren und ihre Verbindungen zu den Flüssen.",
+        "Speicherinhalt, Wasserspiegel und Abgaben aus verfügbaren Betreiberquellen. Jeder Messwert mit Zeitpunkt und Herkunft.",
     },
     warnings: {
       eyebrow: "INFORMIERT BLEIBEN",
-      title: "Die Warnlage verstehen.",
+      title: "Hochwasserwarnungen",
       description:
         "Verfügbare Hochwasserinformationen und der direkte Weg zu den zuständigen amtlichen Diensten.",
     },
@@ -274,7 +287,7 @@ export default function App() {
     },
     sources: {
       eyebrow: "OFFEN & NACHVOLLZIEHBAR",
-      title: "Gute Daten. Klare Quellen.",
+      title: "Quellen & Datenqualität",
       description:
         "Woher unsere Informationen kommen, wie aktuell sie sind und wo die Abdeckung Grenzen hat.",
     },
@@ -295,7 +308,7 @@ export default function App() {
             <Waves size={28} strokeWidth={1.8} />
           </span>
           <span>
-            HND<span className="brand-dot">.</span>
+            HND<span className="brand-dot"> / </span><span className="brand-name">Wasserlage</span>
           </span>
         </button>
         <nav aria-label="Hauptnavigation">
@@ -321,11 +334,7 @@ export default function App() {
             <CircleHelp size={21} />
             <span>Über HND</span>
           </button>
-          <span className="sidebar-caption">
-            WASSER
-            <br />
-            VERBINDET.
-          </span>
+          <span className="sidebar-caption">SCHULPROJEKT<br />HOCHWASSER</span>
         </div>
       </aside>
       <div className="main-shell">
@@ -339,7 +348,7 @@ export default function App() {
             >
               {mobileMenu ? <X size={22} /> : <Menu size={22} />}
             </button>
-            <span>Wasserlage</span>
+            <span>HND · Wasserlage</span>
             <ChevronRight size={12} />
             <strong>{navigation.find((n) => n.id === view)?.label}</strong>
           </div>
@@ -405,11 +414,13 @@ export default function App() {
               )}
             </div>
             <div
-              className={`connection-label ${liveProviders ? "connected" : ""}`}
+              className={`connection-label ${liveProviders && !sourceIssues.length ? "connected" : ""}`}
             >
               <i />
               {loading
                 ? "Daten laden"
+                : sourceIssues.length
+                  ? "Quellen teilweise verfügbar"
                 : liveProviders
                   ? "Quellen verbunden"
                   : "Daten eingeschränkt"}
@@ -480,6 +491,13 @@ export default function App() {
               </button>
             </div>
           )}
+          {!error && !loading && sourceIssues.length > 0 && view !== "sources" && (
+            <div className="source-availability" role="status">
+              <Info size={17} />
+              <span>Teilweise Datenlücken: {sourceIssues.map((provider) => provider.name).join(", ")}. Fehlende Daten sind keine Entwarnung.</span>
+              <button onClick={() => navigate("sources")}>Quellenstatus ansehen <ArrowUpRight size={14} /></button>
+            </div>
+          )}
           {view === "overview" && (
             <>
               <section className="stats-grid" aria-label="Datenübersicht">
@@ -512,7 +530,7 @@ export default function App() {
                     <span className="stat-label">Flüsse & Wasserwege</span>
                     <div className="stat-number">
                       {snapshot.rivers.length}
-                      <span>im regionalen Katalog</span>
+                      <span>Quelle bis Mündung</span>
                     </div>
                   </div>
                   <ArrowUpRight size={17} className="stat-arrow" />
@@ -528,13 +546,14 @@ export default function App() {
                     <span className="stat-label">Talsperren & Speicher</span>
                     <div className="stat-number">
                       {snapshot.reservoirs.length}
-                      <span>im regionalen Katalog</span>
+                      <span>{observedReservoirs} mit Betriebsdaten</span>
                     </div>
                   </div>
                   <ArrowUpRight size={17} className="stat-arrow" />
                 </button>
               </section>
-              <section className="map-section">
+              <div className="observation-note"><span><i />{measured} Wasserstände</span><span>{classified} amtliche Einstufungen</span><button onClick={() => navigate("warnings")}>Warnlage prüfen <ArrowUpRight size={14} /></button></div>
+              <section className={`map-section ${selection ? "has-selection" : ""}`}>
                 <WaterMap
                   key={region}
                   region={region}
@@ -547,7 +566,10 @@ export default function App() {
                 <DetailPanel
                   selection={selection}
                   snapshot={snapshot}
-                  onClose={() => setSelection(null)}
+                  onClose={() => {
+                    setSelection(null);
+                    document.querySelector(".water-map")?.scrollIntoView({ block: "nearest" });
+                  }}
                   navigate={navigate}
                   onSelect={setSelection}
                 />
@@ -573,9 +595,9 @@ export default function App() {
               <section className="content-section">
                 <div className="section-heading">
                   <div>
-                    <span className="eyebrow">ZWISCHEN BERGEN & WASSER</span>
+                    <span className="eyebrow">BETREIBERDATEN & STECKBRIEFE</span>
                     <h2>
-                      Die Talsperren entdecken
+                      Speicher im Blick
                       <span className="count-chip">
                         {snapshot.reservoirs.length}
                       </span>
@@ -598,12 +620,10 @@ export default function App() {
               <section className="river-feature">
                 <div className="river-feature-copy">
                   <span className="eyebrow">
-                    DAS WASSER KENNT KEINE GRENZEN
+                    QUELLEN · ZUFLÜSSE · MÜNDUNGEN
                   </span>
                   <h2>
-                    Viele Quellen.
-                    <br />
-                    Ein verbundenes System.
+                    Wie Gewässer zusammenhängen
                   </h2>
                   <p>
                     Vom Landkreis Harz durch die Täler der Bode bis zur Saale
@@ -706,7 +726,7 @@ export default function App() {
                         <span
                           className={`small-status ${warningClass(station.warningLevel)}`}
                         >
-                          {station.warningLabel || "Nicht verfügbar"}
+                          {station.warningLabel || "Nicht eingestuft"}
                         </span>
                       </div>
                       <span className="table-time">
@@ -827,14 +847,13 @@ export default function App() {
                   </strong>
                   <span>Die Speicher in {REGIONS[region].label}</span>
                 </div>
-                <span className="tiny-tag">Geografischer Katalog</span>
+                <span className="tiny-tag">{observedReservoirs} mit Betriebsdaten</span>
               </div>
               <div className="coverage-note">
                 <Info size={17} />
                 <p>
-                  Aktuelle Füllstände und Abgaben sind noch nicht angebunden. In
-                  jedem Steckbrief findest du die zuständigen Betreiber und
-                  Informationsquellen.
+                  Betreiber veröffentlichen unterschiedliche Größen und Aktualisierungsintervalle.
+                  Fehlende Werte werden offen ausgewiesen. Der Füllgrad allein beschreibt keine Hochwassergefahr.
                 </p>
               </div>
               <ReservoirCards
@@ -848,9 +867,7 @@ export default function App() {
                 />
               )}
               <p className="catalog-notice">
-                Die Landschaftsbilder sind Illustrationen. Positionen und
-                Steckbriefe bilden einen noch nicht vollständig geprüften
-                Startkatalog.
+                Lageangaben sind Näherungen. Betriebsdaten werden getrennt von den statischen Kapazitätsangaben geführt; Quellen stehen im Detail.
               </p>
             </section>
           )}
@@ -1040,9 +1057,9 @@ export default function App() {
               <strong>
                 HND<span>.</span>
               </strong>
-              <span>Wasser verbindet.</span>
+              <span>Hochwasser verstehen.</span>
             </div>
-            <p>Unabhängiges Informationsangebot · Kein amtlicher Warndienst</p>
+            <p>Schulprojekt zu Wasser & Hochwasser · Kein amtlicher Warndienst</p>
             <div>
               <button onClick={() => navigate("sources")}>
                 Quellen & Hinweise

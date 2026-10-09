@@ -1,5 +1,7 @@
 # Geografischer Datenkatalog
 
+Dieses Dokument beschreibt die ursprüngliche Katalogprüfung vor der Live-Anbindung. Die spätere Erweiterung auf 18 Speicher, geprüfte TSB-Positionen und aktuelle Betreiberwerte sind in der [aktuellen Quellenprüfung](data-research-2026-10-09.md) dokumentiert. Die nachstehenden früheren Abrufgrenzen sind keine Aussage über die aktuelle Erreichbarkeit.
+
 Stand: 9. Oktober 2026. Der Katalog in `packages/shared/src/catalog.ts` ist ein redaktioneller Ausgangspunkt mit Schwerpunkt Harz und Harzvorland. Er enthält **27 Flüsse, 16 Talsperren beziehungsweise Speicher und 15 Quellenverweise** (9 Fachportale und 6 konkret geprüfte Betreibersteckbriefe). Er ist keine vollständige Gewässerinventur Deutschlands oder Sachsen-Anhalts.
 
 ## Datenqualität und Herkunft

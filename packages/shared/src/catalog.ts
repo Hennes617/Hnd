@@ -2,7 +2,7 @@
  * Redaktioneller Startkatalog für Harz und Vorland.
  * Keine Vermessungsdaten, Messwerte oder amtlichen Warnungen.
  * Kapazitäten von sechs HWW-Talsperren wurden am 2026-10-09 primär belegt.
- * Alle Positionen und Routen bleiben ungeprüfte Näherungen.
+ * TSB-Speicherpositionen stammen aus dem Betreiberkatalog; Flussrouten bleiben Näherungen.
  */
 export interface GeoPoint {
   name: string;
@@ -28,6 +28,18 @@ export interface River {
   researchVerified: boolean;
 }
 
+export interface ReservoirTelemetry {
+  storage?: { timestamp: string; value: number; unit: string };
+  level?: { timestamp: string; value: number; unit: string };
+  inflow?: { timestamp: string; value: number; unit: string };
+  outflow?: { timestamp: string; value: number; unit: string };
+  fillPercent?: { timestamp: string; value: number; unit: string };
+  freshness: 'current' | 'stale' | 'unavailable';
+  sourceUrl: string;
+  sourceName: string;
+  note?: string;
+}
+
 export interface Reservoir {
   id: string;
   name: string;
@@ -46,6 +58,7 @@ export interface Reservoir {
   description: string;
   geometryAccuracy: 'approximate';
   researchVerified: boolean;
+  telemetry?: ReservoirTelemetry;
 }
 
 export interface Source {
@@ -64,7 +77,7 @@ export const catalogMeta = {
   version: '2026-10-09',
   scope: 'Redaktioneller Startkatalog für Harz, Vorland und wichtige Vorfluter. Keine vollständige Gewässerinventur.',
   geometryNotice: 'Positionen und Flussverläufe sind schematische Näherungen. Nicht für Navigation, Gefahrenabschätzung oder Planung verwenden.',
-  verificationNotice: 'Sechs HWW-Speicherkapazitäten sind anhand der Betreiberseiten geprüft. Koordinaten und Flussverläufe bleiben ungeprüfte Näherungen; weitere Quellen sind Anlaufstellen.',
+  verificationNotice: 'Sechs HWW-Speicherkapazitäten und elf TSB-Speicherstandorte sind anhand der Betreiberquellen geprüft. Flussverläufe und weitere Positionen bleiben Näherungen.',
   researchVerified: false,
 } as const;
 
@@ -1744,7 +1757,7 @@ export const rivers: River[] = [
   }
 ];
 
-export const reservoirs: Reservoir[] = [
+export const reservoirs: Reservoir[] =[
   {
     "id": "rappbode",
     "name": "Rappbodetalsperre",
@@ -1754,14 +1767,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.731,
-    "lon": 10.879,
+    "lat": 51.7399570779581,
+    "lon": 10.8931215155966,
     "sourceIds": [
       "tsb"
     ],
     "description": "Zentrale Trinkwassertalsperre im Rappbodesystem. Die Anlage dient auch dem Hochwasserschutz und der Niedrigwasseraufhöhung.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "wendefurth",
@@ -1772,14 +1790,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.744,
-    "lon": 10.914,
+    "lat": 51.7421065839928,
+    "lon": 10.9186041290429,
     "sourceIds": [
       "tsb"
     ],
     "description": "Bodetalsperre unterhalb der Rappbodetalsperre. Bestandteil des Talsperrensystems für den Wasserhaushalt im Unterharz.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "koenigshuette",
@@ -1790,14 +1813,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.744,
-    "lon": 10.782,
+    "lat": 51.7362481758559,
+    "lon": 10.8048064789938,
     "sourceIds": [
       "tsb"
     ],
     "description": "Überleitungssperre an der Bode bei Königshütte. Wasser kann in das Rappbodesystem übergeleitet werden.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "hassel",
@@ -1808,14 +1836,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.69,
-    "lon": 10.865,
+    "lat": 51.7090198848431,
+    "lon": 10.8309055751544,
     "sourceIds": [
       "tsb"
     ],
     "description": "Vorsperre an der Hassel oberhalb der Rappbodetalsperre. Sie gehört zum Trinkwasserschutzsystem des Rappbodeverbunds.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "rappbode-vorsperre",
@@ -1826,14 +1859,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.696,
-    "lon": 10.813,
+    "lat": 51.7094915269496,
+    "lon": 10.7986315487186,
     "sourceIds": [
       "tsb"
     ],
     "description": "Vorsperre an der Rappbode zwischen Trautenstein und der Hauptsperre.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "mandelholz",
@@ -1844,14 +1882,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.735,
-    "lon": 10.716,
+    "lat": 51.7477323616979,
+    "lon": 10.742188459587,
     "sourceIds": [
       "tsb"
     ],
     "description": "Hochwasserschutzbecken an der Kalten Bode zwischen Elend und Königshütte.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "wippra",
@@ -1862,14 +1905,19 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.57,
-    "lon": 11.22,
+    "lat": 51.5667860772979,
+    "lon": 11.2060859930771,
     "sourceIds": [
       "tsb"
     ],
     "description": "Talsperre an der Wipper im südöstlichen Harz, oberhalb von Wippra.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "kelbra",
@@ -1881,8 +1929,8 @@ export const reservoirs: Reservoir[] = [
       "Sachsen-Anhalt",
       "Thüringen"
     ],
-    "lat": 51.437,
-    "lon": 11.009,
+    "lat": 51.4403307692949,
+    "lon": 11.0128296346084,
     "sourceIds": [
       "tsb",
       "lhw",
@@ -1890,7 +1938,12 @@ export const reservoirs: Reservoir[] = [
     ],
     "description": "Hochwasserrückhalt an der Helme in der Goldenen Aue am südlichen Harzrand. Der Stausee liegt im Bereich der Landesgrenze.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   },
   {
     "id": "oker",
@@ -2076,14 +2129,63 @@ export const reservoirs: Reservoir[] = [
     "region": [
       "Sachsen-Anhalt"
     ],
-    "lat": 51.804,
-    "lon": 10.755,
+    "lat": 51.7918317307942,
+    "lon": 10.7787334350089,
     "sourceIds": [
       "tsb"
     ],
     "description": "Trinkwassertalsperre am Zillierbach südlich von Wernigerode.",
     "geometryAccuracy": "approximate",
-    "researchVerified": false
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
+  },
+  {
+    "id": "kiliansteich",
+    "name": "Kiliansteich",
+    "type": "reservoir",
+    "operator": "Talsperrenbetrieb Sachsen-Anhalt",
+    "region": [
+      "Sachsen-Anhalt"
+    ],
+    "lat": 51.6056264357047,
+    "lon": 11.0240180904927,
+    "sourceIds": [
+      "tsb"
+    ],
+    "description": "Vom Talsperrenbetrieb Sachsen-Anhalt betriebene Stauanlage am Büschengraben.",
+    "geometryAccuracy": "approximate",
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
+  },
+  {
+    "id": "teufelsteich",
+    "name": "Teufelsteich",
+    "type": "reservoir",
+    "operator": "Talsperrenbetrieb Sachsen-Anhalt",
+    "region": [
+      "Sachsen-Anhalt"
+    ],
+    "lat": 51.6205207054713,
+    "lon": 11.1156816883454,
+    "sourceIds": [
+      "tsb"
+    ],
+    "description": "Vom Talsperrenbetrieb Sachsen-Anhalt betriebene Stauanlage am Teufelsgrundbach.",
+    "geometryAccuracy": "approximate",
+    "researchVerified": false,
+    "verifiedFields": [
+      "name",
+      "operator"
+    ],
+    "verifiedAt": "2026-10-09T12:00:00Z"
   }
 ];
 
@@ -2092,7 +2194,7 @@ export const sources: Source[] = [
     "id": "lhw",
     "name": "Hochwasservorhersagezentrale Sachsen-Anhalt",
     "operator": "Landesbetrieb für Hochwasserschutz und Wasserwirtschaft Sachsen-Anhalt",
-    "url": "https://hochwasservorhersage.sachsen-anhalt.de/",
+    "url": "https://hvz.lsaurl.de/",
     "kind": "official",
     "coverage": [
       "Sachsen-Anhalt",
@@ -2103,14 +2205,15 @@ export const sources: Source[] = [
       "Holtemme",
       "Wipper"
     ],
-    "access": "link-only",
-    "researchVerified": false
+    "access": "public-api",
+    "researchVerified": true,
+    "verifiedAt": "2026-10-09T12:15:00Z"
   },
   {
     "id": "tsb",
     "name": "Talsperrenbetrieb Sachsen-Anhalt",
     "operator": "Talsperrenbetrieb Sachsen-Anhalt",
-    "url": "https://www.talsperren-lsa.de/",
+    "url": "https://www.talsperrenbetrieb-lsa.de/wasserstaende-talsperren/",
     "kind": "official",
     "coverage": [
       "Ostharz",
@@ -2118,14 +2221,15 @@ export const sources: Source[] = [
       "Wippra",
       "Kelbra"
     ],
-    "access": "link-only",
-    "researchVerified": false
+    "access": "public-api",
+    "researchVerified": true,
+    "verifiedAt": "2026-10-09T12:15:00Z"
   },
   {
     "id": "hww",
     "name": "Harzwasserwerke",
     "operator": "Harzwasserwerke GmbH",
-    "url": "https://www.harzwasserwerke.de/",
+    "url": "https://www.harzwasserwerke.de/infoservice/aktuelle-talsperrendaten/",
     "kind": "official",
     "coverage": [
       "Westharz",
@@ -2137,14 +2241,15 @@ export const sources: Source[] = [
       "Oder",
       "Oberharzer Wasserwirtschaft"
     ],
-    "access": "link-only",
-    "researchVerified": false
+    "access": "public-api",
+    "researchVerified": true,
+    "verifiedAt": "2026-10-09T12:15:00Z"
   },
   {
     "id": "nlwkn",
     "name": "NLWKN Niedersachsen",
     "operator": "Niedersächsischer Landesbetrieb für Wasserwirtschaft, Küsten- und Naturschutz",
-    "url": "https://www.nlwkn.niedersachsen.de/",
+    "url": "https://www.pegelonline.nlwkn.niedersachsen.de/",
     "kind": "official",
     "coverage": [
       "Niedersachsen",
@@ -2156,8 +2261,9 @@ export const sources: Source[] = [
       "Aller",
       "Weser"
     ],
-    "access": "link-only",
-    "researchVerified": false
+    "access": "public-api",
+    "researchVerified": true,
+    "verifiedAt": "2026-10-09T12:15:00Z"
   },
   {
     "id": "tlubn",

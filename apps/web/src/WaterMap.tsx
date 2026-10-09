@@ -50,11 +50,13 @@ type MapObject = Selection & {
 };
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const COLORS = {
-  current: "#287967",
-  stale: "#7b8587",
+  current: "#236987",
+  classified: "#37806d",
+  stale: "#a4773c",
+  unavailable: "#ffffff",
   elevated: "#c28427",
   high: "#b63f37",
-  reservoir: "#387c9a",
+  reservoir: "#62548c",
 };
 const pointKey = (selection: Selection | null) =>
   selection ? `${selection.type}:${selection.id}` : "";
@@ -84,9 +86,14 @@ function pointsFor(
               ? COLORS.high
               : (station.warningLevel ?? 0) > 0
                 ? COLORS.elevated
-                : station.freshness !== "current"
-                  ? COLORS.stale
-                  : COLORS.current,
+                : station.warningLevel === 0
+                  ? COLORS.classified
+                  : !station.measurement
+                    ? COLORS.unavailable
+                    : station.freshness !== "current"
+                      ? COLORS.stale
+                      : COLORS.current,
+          outline: !station.measurement && (station.warningLevel === undefined || station.warningLevel < 0) ? "#657783" : "#ffffff",
         },
       })),
       ...reservoirs.map((reservoir) => ({
@@ -251,7 +258,7 @@ function installLayers(
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, 3.5, 10, 5.8],
       "circle-color": ["get", "color"],
-      "circle-stroke-color": "#fff",
+      "circle-stroke-color": ["get", "outline"],
       "circle-stroke-width": 1.6,
     },
   });
@@ -308,7 +315,7 @@ export default function WaterMap({
             type: "reservoir",
             id: reservoir.id,
             name: reservoir.name,
-            detail: "Talsperre · ungefähre Position",
+            detail: `Talsperre · ${reservoir.telemetry?.storage || reservoir.telemetry?.level || reservoir.telemetry?.fillPercent || reservoir.telemetry?.inflow || reservoir.telemetry?.outflow ? "Betriebsdaten verfügbar" : "ohne aktuelle Messwerte"}`,
             coordinates: [reservoir.lon, reservoir.lat],
           }),
         ),
@@ -317,7 +324,7 @@ export default function WaterMap({
             type: "station",
             id: station.id,
             name: station.name,
-            detail: `Pegel · ${station.water}`,
+            detail: `Pegel · ${station.water} · ${station.measurement ? `${station.measurement.value} ${station.measurement.unit}` : "kein Wasserstand"}${station.warningLevel === undefined || station.warningLevel < 0 ? " · nicht eingestuft" : ""}`,
             coordinates: [station.longitude, station.latitude],
           }),
         ),
@@ -469,8 +476,8 @@ export default function WaterMap({
     }
     if (key === lastSelection.current) return;
     lastSelection.current = key;
-    if (selection.type === "river")
-      setLayers((current) => ({ ...current, rivers: true }));
+    const selectedLayer = selection.type === "river" ? "rivers" : selection.type === "station" ? "stations" : "reservoirs";
+    if (!layers[selectedLayer]) setLayers((current) => ({ ...current, [selectedLayer]: true }));
     const object = objects.find((candidate) => pointKey(candidate) === key);
     if (object && map && !map.getBounds().contains(object.coordinates))
       map.flyTo({
@@ -716,12 +723,14 @@ export default function WaterMap({
       <div className="ofm-legend" aria-label="Legende">
         <span>
           <i style={{ background: COLORS.current }} />
-          Pegel aktuell
+          Messwert, nicht eingestuft
         </span>
         <span>
           <i style={{ background: COLORS.stale }} />
-          Älter / ohne Wert
+          Älterer Messwert
         </span>
+        <span><i style={{ background: COLORS.unavailable, border: "1px solid #657783" }} />Kein Messwert</span>
+        <span><i style={{ background: COLORS.classified }} />Amtlich Stufe 0</span>
         <span>
           <i className="ofm-warning-dot" />
           Warnstufe

@@ -1,17 +1,20 @@
 # Betrieb mit Docker Compose und Coolify
 
-## Voraussetzungen
+## Aufbau
 
-- Linux-Server mit Docker Engine und Docker Compose v2 oder eine vorhandene Coolify-Installation.
-- Als Ausgangspunkt mindestens 1 CPU und 1 GB RAM zum Betrieb; für den parallelen Image-Build sind 2 GB RAM zweckmäßig.
-- Ausgehendes HTTPS zu den verwendeten Datenquellen und DNS-Auflösung.
-- Für öffentliche Links zwei eigene DNS-Namen und HTTPS am Reverse Proxy.
+Ein Linux-Server mit Docker Engine / Compose v2 oder eine vorhandene Coolify-Installation genügt. Ein Kern und 1 GB RAM sind ein Ausgangspunkt; für parallele Image-Builds sind 2 GB zweckmäßig. Ausgehendes HTTPS und DNS zu den Quellen müssen möglich sein.
 
-Die Anwendung braucht keine Datenbank, keine persistenten Volumes und keine Zugangsdaten zu den angebundenen öffentlichen Quellen. Daten liegen in einem zeitlich begrenzten In-Memory-Cache. Ein Container-Neustart beginnt mit einem leeren Cache; Quellen werden beim nächsten Abruf neu abgefragt.
+```text
+Browser → HTTPS :443 → Coolify-Proxy → web:8080 (Nginx)
+                                       └ /api, /docs, /openapi.json → api:3001
+                                                                     └ /data/hnd.sqlite
+```
 
-## Docker Compose
+Eine eigene HTTPS-Domain am Dienst `web` reicht für Website, API und Dokumentation. Eine zusätzliche API-Domain ist optional. TLS endet am Coolify-Proxy; die Container sprechen im internen Docker-Netz HTTP. Nginx benötigt dafür kein eigenes Zertifikat. Die Basisdatei veröffentlicht keine Host-Ports.
 
-Im Repository-Verzeichnis:
+SQLite speichert erfolgreich empfangene Beobachtungen, Metadaten und Cache im benannten Volume `hnd-data`. Die API startet Migrationen automatisch. Die Datenbank braucht keinen separaten Dienst oder Port. Alle übrigen Containerdateien bleiben schreibgeschützt; beide Container laufen ohne Root.
+
+## Lokal mit Docker starten
 
 ```bash
 cp .env.example .env
@@ -19,12 +22,11 @@ docker compose -f compose.yaml -f compose.local.yaml config --quiet
 docker compose -f compose.yaml -f compose.local.yaml up --build -d
 docker compose -f compose.yaml -f compose.local.yaml ps
 curl --fail http://localhost:8080/health
+curl --fail http://localhost:8080/api/v1/sources
 curl --fail http://localhost:3001/health
 ```
 
-Die Website ist unter `http://localhost:8080` erreichbar. API-Dokumentation und Maschinenbeschreibung liegen unter `http://localhost:3001/docs` und `http://localhost:3001/openapi.json`. Die API ist auf Port 3001 und die Website auf Port 8080 getrennt erreichbar.
-
-Die Basisdatei `compose.yaml` veröffentlicht keine Host-Ports. Coolify erreicht die internen Container-Ports über sein Docker-Netzwerk und benötigt die lokale Zusatzdatei nicht. Erst `compose.local.yaml` richtet für den lokalen Zugriff Host-Ports ein; `BIND_ADDRESS=127.0.0.1` begrenzt diese auf Loopback. Ein lokaler Reverse Proxy kann diese Ports ebenfalls verwenden. Bei einem lokalen Portkonflikt `WEB_PORT` oder `API_PORT` ändern; die Container-Ports bleiben immer 8080 beziehungsweise 3001.
+Website: `http://localhost:8080`; Dokumentation: `http://localhost:8080/docs`; direkte API: `http://localhost:3001`. `compose.local.yaml` ergänzt die Loopback-Hostbindungen. Bei belegten Host-Ports `WEB_PORT` oder `API_PORT` ändern; die internen Ports bleiben 8080 / 3001.
 
 ```bash
 docker compose -f compose.yaml -f compose.local.yaml logs --tail=100 api web
@@ -32,104 +34,146 @@ docker compose -f compose.yaml -f compose.local.yaml restart api
 docker compose -f compose.yaml -f compose.local.yaml down
 ```
 
-`down` entfernt die Container und das Compose-Netzwerk. Die Originaldaten verbleiben bei den Quellen. Logdateien werden pro Container auf drei Dateien zu jeweils 10 MB begrenzt.
+`down` erhält das Datenvolume. **`down --volumes` würde die lokal gesammelten Daten löschen.** Logdateien sind auf drei Dateien zu jeweils 10 MB pro Container begrenzt.
 
-## Coolify: Website und API getrennt veröffentlichen
+## Coolify einrichten
 
-1. Ein neues Projekt beziehungsweise eine neue Ressource vom Git-Repository anlegen. Als Build-/Deployment-Typ **Docker Compose** wählen und ausschließlich `compose.yaml` im Repository-Root auswählen. `compose.local.yaml` nicht hinzufügen. In Coolify keine zusätzlichen Host-Port-Mappings setzen.
-2. Beide Dienste aus der Compose-Datei übernehmen. Für `web` die öffentliche Website-Domain mit Zielport `8080` zuweisen; für `api` die öffentliche API-Domain mit Zielport `3001` zuweisen. Beispiel: `https://wasser.deine-domain.de` und `https://api.deine-domain.de`. Je nach Coolify-Version wird der interne Port im Domainfeld oder im Service-Dialog eingetragen.
-3. Die DNS-Einträge beider Namen auf den Coolify-Server richten. HTTPS-Zertifikate im Coolify-Proxy aktivieren.
-4. Folgende Variablen in den Umgebungs-/Build-Einstellungen dieser Ressource setzen:
+1. Git-Repository als **Docker Compose**-Ressource mit ausschließlich `compose.yaml` auswählen. `compose.local.yaml` und zusätzliche Host-Port-Mappings nicht verwenden.
+2. In den Domains des Dienstes **web** den eigenen Hostnamen mit Protokoll **HTTPS**, internem Zielport **8080**, ohne zusätzlichen Pfad eintragen. Bei einem einzelnen URL-Feld: `https://wasser.deine-domain.de:8080`. Der Port bezeichnet das interne Weiterleitungsziel; Besucher verwenden `https://wasser.deine-domain.de` auf Port 443.
+3. Den DNS-A-Eintrag auf die öffentliche Server-IPv4 richten. Ein vorhandener AAAA-Eintrag muss zur funktionsfähigen IPv6 dieses Servers führen. Eingehend TCP 80 und 443 zum Coolify-Proxy zulassen. Die Beispieladresse ist keine veröffentlichte Instanz.
+4. Variablen setzen:
 
    ```dotenv
-   API_PUBLIC_URL=https://api.deine-domain.de
-   VITE_PUBLIC_API_URL=https://api.deine-domain.de
+   API_PUBLIC_URL=
+   VITE_PUBLIC_API_URL=
    CORS_ORIGIN=https://wasser.deine-domain.de
+   TRUST_PROXY=true
+   OBSERVATION_RETENTION_DAYS=90
+   REFRESH_INTERVAL_SECONDS=300
    ```
 
-5. Neu bauen und deployen. `VITE_PUBLIC_API_URL` muss beim Web-Build verfügbar sein; eine reine Änderung zur Laufzeit aktualisiert die ausgelieferten Links nicht.
-6. Beide Healthchecks und anschließend die Live-Datenquellen prüfen. Ein gesunder Container bestätigt nur, dass der Dienst läuft, nicht die Erreichbarkeit aller externen Anbieter.
+   Leere API-Adressen nutzen den aktuellen Ursprung. Damit enthält der öffentliche Web-Build keine auf dem Handy unbrauchbaren `localhost`-Dokumentationslinks. Nginx leitet API und Dokumentation intern weiter.
+5. Das persistente Volume am API-Dienst erhalten, neu bauen und deployen. Ein unveränderter Ressourcen-/Volumename ist beim Redeployment wichtig. Ein neues Coolify-Projekt kann ein anderes Volume erhalten; vorhandene Daten dann ausdrücklich migrieren.
+6. Website, `/docs`, `/openapi.json`, `/api/v1/sources` und `/api/v1/overview?region=harz` über die echte HTTPS-Domain öffnen. Healthchecks belegen Dienstverfügbarkeit, keine vollständige Verfügbarkeit der Originalquellen.
 
-Die Browser-Anfragen der Website bleiben auf ihrer Website-Domain unter `/api/…`. Nginx leitet sie intern an `api:3001` weiter. Die zusätzliche API-Domain dient externen Clients und dem Link zur API-Dokumentation. Für diese Aufteilung sind weder Cross-Origin-Cookies noch vertrauliche Variablen im Frontend nötig.
+Coolify verwaltet Routing und Zertifikate aus Domain und Zielport. Siehe [offizielle Domain-Dokumentation](https://coolify.io/docs/core/networking/domains) und [Traefik-Übersicht](https://coolify.io/docs/core/networking/proxy/traefik/overview), geprüft am 9. Oktober 2026.
 
-### Bestehender Fehler „port is already allocated“
+### Optionale zweite API-Domain
 
-Bei `Bind for 0.0.0.0:8080 failed: port is already allocated` ist der Build bereits abgeschlossen, aber ein Host-Port wird von einem anderen Dienst verwendet. Den aktuellen Stand von `main` mit der Basisdatei `compose.yaml` neu deployen. Falls Coolify eigene Port-Mappings oder eine gespeicherte Compose-Kopie verwendet, dort die Host-Freigaben für 8080 und 3001 entfernen beziehungsweise die Datei aus Git aktualisieren. Die internen Domain-Zielports **8080** und **3001** bleiben eingetragen. Ein anderer Dienst auf dem Server muss dafür nicht gestoppt werden.
+Zusätzlich **api** mit HTTPS und internem Port **3001** verbinden. Dann können folgende Werte gesetzt werden:
+
+```dotenv
+API_PUBLIC_URL=https://api.deine-domain.de
+VITE_PUBLIC_API_URL=https://api.deine-domain.de
+CORS_ORIGIN=https://wasser.deine-domain.de
+```
+
+`API_PUBLIC_URL` steuert den OpenAPI-Server, `VITE_PUBLIC_API_URL` die Dokumentationslinks der Website. Browser-Datenanfragen bleiben unter `/api` auf der Website-Domain. Nach Änderungen der Vite-Variable ist ein neuer Web-Build erforderlich. Nicht denselben Hostnamen ohne eindeutige Pfadrouten gleichzeitig beiden Diensten zuweisen. Eine gesonderte `/api`-Route ist hier nicht nötig und könnte bei automatischem Entfernen des Präfixes falsche URLs erzeugen.
+
+## HTTPS-Fehler gezielt eingrenzen
+
+**Belegter Repositorykontext:** Ein früherer Netcup-Deploymentversuch scheiterte am bereits belegten Host-Port 8080; die Basis-Compose-Datei wurde deshalb auf rein interne Ports umgestellt. Außerdem waren Dokumentationslinks und OpenAPI standardmäßig auf `http://localhost:3001` festgelegt. Nginx ersetzte das vom TLS-Proxy gelieferte `X-Forwarded-Proto: https` durch sein internes `http`. Beide letzteren Konfigurationen sind korrigiert. Keine dieser Beobachtungen beweist die konkrete Ursache eines fehlenden öffentlichen Zertifikats.
+
+**Noch nicht live belegt:** Im Repository stehen weder eine verifizierte öffentliche Domain noch Zugang zum tatsächlichen Coolify-/DNS-Betrieb. Die Zertifikatsausstellung wurde deshalb nicht bestätigt. Folgende Prüfung erfolgt auf dem vorhandenen Server und mit seinem tatsächlichen Hostnamen:
+
+1. Coolify-Domain des `web`-Dienstes: HTTPS aktiviert, Zielport 8080, keine konkurrierende Ressource mit gleichem Hostnamen. Bei „Custom/None“ als Proxy gibt es keine von Coolify verwaltete Zertifikatsausstellung. Nach Änderung redeployen.
+2. DNS-A und gegebenenfalls AAAA auf denselben erreichbaren Server prüfen. TCP 80 und 443 müssen über beide veröffentlichten IP-Protokolle beim Proxy ankommen. Ein falscher AAAA-Eintrag kann die Prüfung trotz funktionierender IPv4 verhindern. [Coolify: Zertifikatsfehler](https://coolify.io/docs/troubleshoot/dns-and-domains/lets-encrypt-not-working)
+3. Server → Proxy → Logs in Coolify ansehen; alternativ auf dem Server:
+
+   ```bash
+   docker logs --since 30m coolify-proxy
+   curl -I http://wasser.deine-domain.de
+   curl -Iv https://wasser.deine-domain.de
+   ```
+
+   TLS-Prüfung nicht mit `-k` umgehen. Fehlermeldungen zu Challenge, DNS, Rate Limit oder Resolver bestimmen den nächsten Schritt. Bei einem vorgeschalteten CDN/WAF muss die Challenge erreichbar sein. Einen globalen Zertifikatsspeicher nicht pauschal löschen.
+4. Zeigt das Log ausdrücklich einen nicht verfügbaren `letsencrypt`-Resolver oder Probleme mit `acme.json`, Besitzer und Lese-/Schreibrechte der tatsächlichen Proxydatei prüfen; Traefik verlangt Dateimodus 600. Nur den belegten Fehler korrigieren. [Coolify: Certificate Resolver](https://coolify.io/docs/troubleshoot/dns-and-domains/certificate-resolver-doesnt-exist)
+5. Nach einem erfolgreichen TLS-Handshake `/docs` und `/api/v1/sources` aufrufen. **Ungültiges Zertifikat** ist ein Proxy-/DNS-/ACME-Problem; **HTTP 502/503 nach erfolgreichem TLS** ist ein Routing-/Containerproblem; **HTTP 200 mit fehlenden Messwerten** verlangt die Prüfung von `providers` und API-Logs. Das sind verschiedene Fehlerklassen.
+
+Beim früheren Fehler `Bind for 0.0.0.0:8080 failed: port is already allocated` gespeicherte Compose-Kopien und Coolify-Port-Mappings aktualisieren. Keine fremden Dienste stoppen: Der Zielport 8080 wird nur intern verwendet.
+
+## SQLite und gesammelte Verläufe
+
+`DB_PATH=/data/hnd.sqlite` ist im Container fest konfiguriert. Das Image legt `/data` mit Schreibrechten für `node` (UID 1000) an; das benannte Volume übernimmt diese beim ersten Start. Bei einem eigenen Host-Bind-Mount muss dessen Verzeichnis für UID 1000 schreibbar sein. Fehlende Schreibrechte in API-Logs beheben, bevor Beobachtungen gesammelt werden können.
+
+Ein Hintergrundabruf sammelt standardmäßig alle fünf Minuten echte Beobachtungen. Die Aufbewahrung beträgt standardmäßig 90 Tage. Eine frische Datenbank enthält keine Vergangenheit: Umfangreiche historische Verläufe entstehen erst während des Betriebs oder werden aus tatsächlich verfügbaren Originalzeitreihen übernommen. Cache-Fristen und Datenfrische bleiben trotz dauerhafter Speicherung begrenzt; eine alte Beobachtung wird dadurch nicht zu einer aktuellen Meldung.
+
+### Konsistente Sicherung
+
+SQLite kann zusätzliche `-wal`-/`-shm`-Dateien verwenden. Während Schreibzugriffen **nicht nur `hnd.sqlite` kopieren**. Für dieses kleine Projekt ist eine kurze Unterbrechung mit vollständiger Verzeichniskopie einfach und verlässlich:
+
+```bash
+mkdir -p backups
+docker compose stop api
+docker compose cp api:/data/. ./backups/hnd-data/
+docker compose start api
+```
+
+Im lokalen Betrieb bei allen drei Compose-Befehlen zusätzlich `-f compose.yaml -f compose.local.yaml` verwenden. In Coolify muss das Kommando das tatsächliche Ressourcenprojekt adressieren; alternativ den API-Container über die Oberfläche stoppen und dessen vollständiges Volume sichern. Sicherungen außerhalb des Servers aufbewahren. Für unterbrechungsfreie Backups die SQLite-Backup-API oder ein verfügbares `sqlite3 ... '.backup ...'` verwenden.
+
+Zum Wiederherstellen API stoppen, die vollständige konsistente Sicherung in das richtige Datenvolume einspielen, Schreibrechte für UID 1000 prüfen und API starten. Bei laufendem Prozess keine Datenbankdateien austauschen. Danach Logs, Datenbankzustand und eine bekannte historische Reihe prüfen. Eine Rücksicherung sollte zunächst auf einer getrennten lokalen Instanz getestet werden.
 
 ## Konfiguration
 
 | Variable | Standard | Bedeutung |
 | --- | --- | --- |
-| `WEB_PORT` | `8080` | Host-Port der Website, nur mit `compose.local.yaml` |
-| `API_PORT` | `3001` | Host-Port der API, nur mit `compose.local.yaml` |
-| `BIND_ADDRESS` | `127.0.0.1` | Bind-Adresse, nur mit `compose.local.yaml` |
-| `VITE_PUBLIC_API_URL` | `http://localhost:3001` | öffentliche API-Basisadresse für Web-Links; Build-Variable |
-| `API_PUBLIC_URL` | `http://localhost:3001` | dokumentierte öffentliche API-Adresse; keine Änderung des internen Listen-Ports |
-| `CORS_ORIGIN` | `http://localhost:8080` | erlaubte Browser-Ursprünge, bei mehreren komma-getrennt |
+| `WEB_PORT` / `API_PORT` | `8080` / `3001` | Host-Ports, nur mit lokalem Override |
+| `BIND_ADDRESS` | `127.0.0.1` | lokale Bind-Adresse |
+| `VITE_PUBLIC_API_URL` | leer | Dokumentationslinks; leer = eigener Ursprung, Build-Variable |
+| `API_PUBLIC_URL` | leer | OpenAPI-Server; leer = eigener Ursprung |
+| `CORS_ORIGIN` | `http://localhost:8080` | erlaubte Browser-Ursprünge, mehrere komma-getrennt |
+| `TRUST_PROXY` | `true` in Compose | vertraut internen Proxy-Headern für Protokoll und Quell-IP |
+| `DB_PATH` | `/data/hnd.sqlite` im Container | SQLite-Datei auf dem Datenvolume |
+| `OBSERVATION_RETENTION_DAYS` | `90` | Aufbewahrung echter Beobachtungen |
+| `REFRESH_INTERVAL_SECONDS` | `300` | regelmäßiger Hintergrundabruf |
 | `CACHE_TTL_SECONDS` | `300` | Cache-Lebensdauer; API begrenzt auf 30–3600 Sekunden |
-| `UPSTREAM_TIMEOUT_MS` | `8000` | Upstream-Timeout; API begrenzt auf 500–30000 Millisekunden |
+| `UPSTREAM_TIMEOUT_MS` | `8000` | Abfrage-Timeout; API begrenzt auf 500–30000 Millisekunden |
 
-Das API-Ratenlimit liegt bei 120 Anfragen pro Minute und Quelladresse. Standardmäßig werden Weiterleitungsheader nicht vertraut; hinter einem Reverse Proxy kann das Limit daher für mehrere Besucher gemeinsam gelten. `TRUST_PROXY=true` ist nur für einen abgeschirmten API-Dienst geeignet, dessen vorgeschalteter Proxy eingehende Forwarding-Header zuverlässig ersetzt. Niemals unkontrollierte Header öffentlicher Clients vertrauen. Die Standardkonfiguration ist bewusst konservativ.
+`TRUST_PROXY=true` passt zur internen API ohne öffentliche Host-Port-Bindung. Vorgeschaltete Proxies müssen eingehende Forwarding-Header zuverlässig setzen. Bei einer direkt öffentlich erreichbaren API `TRUST_PROXY=false` setzen; sonst kann ein Client die Rate-Limit-Quelladresse beeinflussen. Ohne Proxyvertrauen kann das Limit hinter einem Proxy dagegen für alle Besucher gemeinsam gelten. Das Limit beträgt 120 Anfragen pro Minute und Quell-IP.
 
-Origins enthalten Schema und gegebenenfalls Port, aber keinen Pfad oder abschließenden Slash. Beispiel: `https://wasser.deine-domain.de,https://weitere-seite.de`. CORS ist ein Browsermechanismus; die öffentliche Lese-API ist kein zugangsgeschützter Dienst.
-
-Die `.env` im Repository-Root wird von Docker Compose zur Variablenersetzung gelesen. Sie wird nicht in die Images kopiert. Beim direkten Start mit `npm run dev` gelten die im Prozess gesetzten Variablen. `HOST` und `PORT` sind im Container fest auf `0.0.0.0` und `3001` gesetzt, damit der interne Proxy konsistent bleibt.
+Origins enthalten Schema und gegebenenfalls Port, keinen Pfad oder abschließenden Slash. Die `.env` wird von Compose zur Ersetzung gelesen und nicht in Images kopiert. `npm run dev` verwendet Prozessvariablen. CORS ist kein Zugriffsschutz; die API ist öffentlich lesbar.
 
 ## Netzwerk und Quellen
 
-Für die aktuell eingebundenen Adapter ausgehendes HTTPS erlauben:
-
 | Host | Zweck |
 | --- | --- |
-| `www.pegelonline.wsv.de` | PEGELONLINE-Messstellen und Messwerte |
-| `api.hochwasserzentralen.de` | Landespegel und Hochwasserklassen der Hochwasserzentralen |
-| `hvz.lsaurl.de` | Pegeldaten Sachsen-Anhalt |
-| `warnung.bund.de` | ergänzende amtliche Warnmeldungen |
-| `api.open-meteo.com` | 72-Stunden-Niederschlagsvorhersage, serverseitig gebündelt und gecacht |
-| `flood-api.open-meteo.com` | GloFAS-Abflussreihen an unvalidierten Modellrasterpunkten im Raum Halle und Magdeburg |
-| `tiles.openfreemap.org` | Kartenstil, Vektorkacheln, Symbole und Kartenschriften; direkter Abruf im Browser |
+| `www.pegelonline.wsv.de` | Bundeswasserstraßen: Standorte und Messwerte |
+| `api.hochwasserzentralen.de` | Landespegel und Hochwasserklassen |
+| `hvz.lsaurl.de` | Landespegel Sachsen-Anhalt |
+| `bis.azure-api.net` / `www.pegelonline.nlwkn.niedersachsen.de` | NLWKN: Niedersachsen-Messwerte und Zeitreihen; öffentlich dokumentierter gemeinsamer Webservice-Schlüssel, keine persönlichen Zugangsdaten |
+| `warnung.bund.de` | LHP-Warnmeldungen über NINA |
+| `www.talsperrenbetrieb.de` | Betriebsdaten der Talsperren in Sachsen-Anhalt |
+| `www.harzwasserwerke.de` | Betreiberangaben und verfügbare Talsperrenwerte |
+| `api.open-meteo.com` / `flood-api.open-meteo.com` | serverseitige Wetter-/Abflussmodelle |
+| `tiles.openfreemap.org` | Kartenstil, Kacheln und Schriften, direkt aus dem Browser |
 
-Die genauen URLs, Datenumfänge und Rechte sind bei der jeweiligen Quelle zu prüfen. Ein amtliches Webportal ist nicht automatisch eine dokumentierte oder uneingeschränkt weiterverwendbare API. Die Aggregation deckt insbesondere nicht alle Landespegel, Privatpegel, Talsperrenstände oder hydrologischen Vorhersagen in Deutschland ab.
+Adapter können vom Anbieter veröffentlichte Unterdomains verwenden; konkrete URLs stehen im Quellcode und Quellenverzeichnis. Image-Builds benötigen Docker Hub und `registry.npmjs.org`. Die Oberfläche nutzt Systemschriften. Die Karte benötigt WebGL; bei Fehlern bleibt die Objektliste nutzbar. OpenFreeMap-Abrufe im Browser sind in der Datenschutzerklärung zu berücksichtigen. Open-Meteos öffentlicher schlüsselloser Dienst setzt nichtkommerzielle Nutzung und Fair Use voraus; siehe [Wetterdaten](weather-data.md).
 
-Image-Builds benötigen Zugriff auf Docker Hub und `registry.npmjs.org`. Die Oberfläche nutzt Systemschriften; Kartenschriftzeichen werden von OpenFreeMap geladen. Die Karte benötigt WebGL. Bei fehlendem WebGL oder nicht erreichbaren Kacheln bleibt eine durchsuchbare Objektliste verfügbar. TLS-Prüfungen bleiben aktiviert. Hinter einem Unternehmensproxy können `HTTP_PROXY`, `HTTPS_PROXY` und `NO_PROXY` in die API-Umgebung durchgereicht werden. `NO_PROXY` sollte interne Dienste wie `localhost,127.0.0.1,api,web` enthalten.
+### Unternehmensproxy mit zusätzlicher CA
 
-Die Karte stellt eine direkte Verbindung vom Browser zu OpenFreeMap her; dies in der Datenschutzerklärung berücksichtigen. Die gespeicherten BKG-Grenzen benötigen zur Laufzeit keinen Geodatendienst. Wetter und Abfluss werden getrennt für 30 Minuten gepuffert; fehlende Werte bleiben ausdrücklich unbekannt. Open-Meteos öffentlicher, schlüsselloser Dienst setzt nichtkommerzielle Nutzung und Fair Use voraus. Die kostenlose eigene API ändert diese Bedingungen nicht; siehe [Wetterdaten und Nutzungsbedingungen](weather-data.md).
-
-### Zusätzliche CA für einen HTTPS-Proxy
-
-Die Dockerfiles akzeptieren optional das BuildKit-Secret `proxy_ca`. Bei normalen Servern mit öffentlichen Zertifikaten ist es unnötig. In einer Umgebung mit HTTPS-Inspection die bereitgestellte CA sicher als Build-Secret einbinden. Beispiel für eine zusätzliche Compose-Datei außerhalb des Repositorys:
+TLS-Prüfung bleibt aktiv. Die Dockerfiles akzeptieren optional das BuildKit-Secret `proxy_ca`. Bei normalen öffentlichen Zertifikaten ist es nicht erforderlich. Bei HTTPS-Inspection eine außerhalb des Repositorys gespeicherte CA verwenden. Beispiel für einen separaten Compose-Override:
 
 ```yaml
 services:
   api:
     build:
-      secrets:
-        - proxy_ca
+      secrets: [proxy_ca]
     environment:
       NODE_EXTRA_CA_CERTS: /run/secrets/proxy_ca
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: localhost,127.0.0.1,api,web
-    secrets:
-      - proxy_ca
+    secrets: [proxy_ca]
   web:
     build:
-      secrets:
-        - proxy_ca
+      secrets: [proxy_ca]
 secrets:
   proxy_ca:
     file: ${PROXY_CA_FILE}
 ```
 
-```bash
-PROXY_CA_FILE=/pfad/zur/proxy-ca.pem docker compose \
-  -f compose.yaml -f compose.local.yaml -f /pfad/zur/compose.proxy.yaml up --build -d
-```
+Die CA wird nicht in das Image eingebaut. Für Build-Schritte gegebenenfalls Proxyvariablen als `build.args` übergeben. Der Proxy muss aus dem Docker-Netz erreichbar sein; eine nötige Hostauflösung über einen externen Override mit der vom Betreiber bestätigten Adresse konfigurieren. Keine Zugangsdaten oder festen Infrastrukturadressen im Repository hinterlegen.
 
-Die CA bleibt außerhalb der Images. Die Proxy-Adresse muss aus dem Docker-Netzwerk erreichbar sein. Für Build-Schritte zusätzlich die Proxy-Variablen als `build.args` durchreichen. Falls der Proxy-Hostname nur im Host-Netz auflösbar ist, ihn mit der vom Betreiber bereitgestellten Adresse unter `build.extra_hosts` eintragen; den Proxy selbst weiterhin verwenden. Keine festen Cloud-Adressen in dieses Repository übernehmen. Das Deaktivieren der Zertifikatsprüfung ist keine unterstützte Konfiguration.
+## Öffentlicher Betrieb
 
-## Vor einer öffentlichen Freigabe
-
-Zuerst Healthchecks, API-Dokumentation und Quellenstatus über die tatsächlichen Domains öffnen. Im Webangebot müssen fehlende oder veraltete Daten als solche erkennbar bleiben. Eine fehlende Warnmeldung, ein Adapterfehler oder ein leerer Cache begründen keine Entwarnung. Quellenangaben und Datenstände bei Weiterverwendung beibehalten und die Nutzungsbedingungen der Originalanbieter prüfen.
-
-Die Anwendung versendet keine SMS, E-Mails oder Push-Warnungen und ersetzt keine amtliche Warn-App. Impressum, Kontakt und eine dem konkreten Hosting entsprechende Datenschutzerklärung sind vor einem öffentlichen Betrieb durch den Betreiber zu ergänzen. Der Code erhebt keine Nutzerkonten; Server- und Proxylogs können dennoch IP-Adressen enthalten.
+Amtliche Herkunft, Datenzeit und Datenlücken sichtbar halten. Das Projekt versendet keine Warn-SMS, E-Mails oder Pushmeldungen. Betreiberangaben, Impressum, Kontakt und eine zum Hosting passende Datenschutzerklärung sind zu ergänzen. Server- und Proxylogs können IP-Adressen enthalten. Eine fehlende Warnmeldung, ein Adapterfehler oder ein leerer Cache ist keine Entwarnung.

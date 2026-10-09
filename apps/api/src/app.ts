@@ -4,10 +4,8 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import {
   rivers,
-  reservoirs,
   sources,
   riverInRegion,
-  reservoirInRegion,
 } from "@hnd/shared";
 import type { Region } from "@hnd/shared";
 import { readConfig, type Config } from "./config.js";
@@ -16,6 +14,7 @@ import { createFetcher, type FetchJson } from "./upstream.js";
 import { docsHtml } from "./docs.js";
 import { openapi } from "./openapi.js";
 import { createForecastService } from "./forecast.js";
+import { WaterStore } from "./storage.js";
 const regionQuery = {
   type: "object",
   additionalProperties: false,
@@ -50,8 +49,38 @@ export async function createApp(options: AppOptions = {}) {
   });
   const fetchJson =
     options.fetchJson || createFetcher(config.upstreamTimeoutMs);
-  const service = options.service || createDataService(fetchJson, config);
+  const store = !options.service && config.databasePath
+    ? new WaterStore(config.databasePath, config.observationRetentionDays)
+    : undefined;
+  const service = options.service || createDataService(fetchJson, config, store);
   const forecastService = createForecastService(fetchJson);
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let refreshPending: Promise<void> | undefined;
+  let stopping = false;
+  // Collect real observations even when no browser is open. Never overlap sweeps.
+  const refresh = () => {
+    if (refreshPending || stopping) return;
+    refreshPending = service.overview("germany")
+      .then(() => undefined)
+      .catch((error: unknown) => app.log.error({ err: error }, "Observation refresh failed"))
+      .finally(() => {
+        refreshPending = undefined;
+        if (!stopping && config.refreshIntervalMs) {
+          refreshTimer = setTimeout(refresh, config.refreshIntervalMs);
+          refreshTimer.unref();
+        }
+      });
+  };
+  app.addHook("onListen", async () => {
+    if (!store || !config.refreshIntervalMs) return;
+    refresh();
+  });
+  app.addHook("onClose", async () => {
+    stopping = true;
+    if (refreshTimer) clearTimeout(refreshTimer);
+    await refreshPending;
+    store?.close();
+  });
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
@@ -109,6 +138,7 @@ export async function createApp(options: AppOptions = {}) {
     status: "ok",
     service: "hnd-api",
     uptime: Math.floor(process.uptime()),
+    ...(store ? { storage: store.status() } : {}),
   }));
   app.get("/", async (_, reply) =>
     reply.type("text/html; charset=utf-8").send(docsHtml),
@@ -181,9 +211,8 @@ export async function createApp(options: AppOptions = {}) {
         history ||
         reply.status(404).send({
           error: {
-            code: "HISTORY_NOT_AVAILABLE",
-            message:
-              "Für diesen Pegel ist keine integrierte Wasserstandszeitreihe verfügbar.",
+            code: "STATION_NOT_FOUND",
+            message: "Pegel nicht gefunden.",
           },
         })
       );
@@ -221,11 +250,7 @@ export async function createApp(options: AppOptions = {}) {
   app.get<{ Querystring: { region?: Region } }>(
     "/api/v1/reservoirs",
     { schema: { querystring: regionQuery } },
-    async (request) => ({
-      reservoirs: reservoirs.filter((reservoir) =>
-        reservoirInRegion(reservoir, request.query.region || "sachsen-anhalt"),
-      ),
-    }),
+    async (request) => service.reservoirs(request.query.region || "sachsen-anhalt"),
   );
   app.get("/api/v1/sources", async () => ({ sources }));
   return app;

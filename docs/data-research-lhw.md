@@ -1,5 +1,7 @@
 # Datenrecherche: Hochwasser, Deutschland und Harz
 
+Die später implementierten Betreiberfeeds, NLWKN-Messwerte, korrigierten Pegelzuordnungen und SQLite-Verläufe sind in der [aktuellen Quellenprüfung](data-research-2026-10-09.md) dokumentiert. Dieses Dokument hält die frühere Recherche und deren damalige Abrufgrenzen fest.
+
 Recherche vom 9. Oktober 2026. Das Projekt ist ein unabhängiges Informationsangebot, kein amtlicher Hochwassernachrichtendienst. Es gibt keine einzelne freie API, die alle deutschen Pegel, Talsperren, Warnungen und Flussverläufe vollständig liefert.
 
 ## Nachweisstand

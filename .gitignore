@@ -8,3 +8,7 @@ playwright-report/
 test-results/
 *.log
 .DS_Store
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.cache/

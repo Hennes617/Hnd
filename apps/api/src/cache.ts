@@ -9,6 +9,10 @@ interface Entry<T> {
   result: CacheResult<T>;
   nextAttempt: number;
 }
+export interface CacheStorage<T> {
+  read(): { data: T; fetchedAt: string } | null;
+  write(data: T, fetchedAt: string): void;
+}
 /** Coalesces callers, bounds stale data, and backs off failing providers. */
 export class AsyncCache<T> {
   private entry?: Entry<T>;
@@ -18,7 +22,17 @@ export class AsyncCache<T> {
     private readonly staleMs: number,
     private readonly now: () => number = Date.now,
     private readonly retryMs = 30_000,
-  ) {}
+    private readonly storage?: CacheStorage<T>,
+  ) {
+    const saved = storage?.read();
+    const age = saved ? this.now() - Date.parse(saved.fetchedAt) : Infinity;
+    if (saved && Number.isFinite(age) && age >= 0 && age <= staleMs) {
+      this.entry = {
+        result: { ...saved, state: "cached", stale: age >= ttlMs },
+        nextAttempt: Date.parse(saved.fetchedAt) + ttlMs,
+      };
+    }
+  }
   async get(loader: () => Promise<T>): Promise<CacheResult<T>> {
     if (this.entry && this.now() < this.entry.nextAttempt) {
       if (
@@ -56,6 +70,7 @@ export class AsyncCache<T> {
         state: "live",
         stale: false,
       };
+      this.storage?.write(data, result.fetchedAt!);
       this.entry = { result, nextAttempt: this.now() + this.ttlMs };
       return result;
     } catch (error) {

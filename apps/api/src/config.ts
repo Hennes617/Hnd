@@ -4,6 +4,9 @@ export interface Config {
   corsOrigins: string[] | "*";
   upstreamTimeoutMs: number;
   cacheTtlMs: number;
+  databasePath?: string;
+  observationRetentionDays?: number;
+  refreshIntervalMs?: number;
 }
 function integer(
   name: string,
@@ -32,5 +35,8 @@ export function readConfig(): Config {
             .filter(Boolean),
     upstreamTimeoutMs: integer("UPSTREAM_TIMEOUT_MS", 8000, 500, 30000),
     cacheTtlMs: integer("CACHE_TTL_SECONDS", 300, 30, 3600) * 1000,
+    databasePath: process.env.DB_PATH?.trim() || "./data/hnd.sqlite",
+    observationRetentionDays: integer("OBSERVATION_RETENTION_DAYS", 90, 7, 3650),
+    refreshIntervalMs: integer("REFRESH_INTERVAL_SECONDS", 300, 30, 3600) * 1000,
   };
 }
