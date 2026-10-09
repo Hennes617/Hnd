@@ -43,18 +43,18 @@ HND_E2E_PRODUCTION=1 npm run test:e2e
 
 ```bash
 cp .env.example .env
-docker compose up --build -d
-docker compose ps
+docker compose -f compose.yaml -f compose.local.yaml up --build -d
+docker compose -f compose.yaml -f compose.local.yaml ps
 ```
 
 - Website: <http://localhost:8080>
 - API: <http://localhost:3001/docs>
 
-Die Ports werden standardmäßig an `127.0.0.1` gebunden. Für Zugriff aus einem anderen Rechner ist ein Reverse Proxy mit TLS vorgesehen. Beide Container laufen ohne Root, besitzen Healthchecks und haben ein schreibgeschütztes Dateisystem. Der Cache liegt im Arbeitsspeicher; es werden keine Volumes benötigt.
+Für den lokalen Zugriff ergänzt `compose.local.yaml` die Host-Ports an `127.0.0.1`. Die Basisdatei `compose.yaml` veröffentlicht keine Host-Ports und ist für Coolify vorgesehen. Beide Container laufen ohne Root, besitzen Healthchecks und haben ein schreibgeschütztes Dateisystem. Der Cache liegt im Arbeitsspeicher; es werden keine Volumes benötigt.
 
 ## Zwei Domains mit Coolify
 
-In Coolify das Repository als **Docker Compose**-Anwendung mit `compose.yaml` einbinden. Dem Dienst `web` eine Domain mit internem Port **8080**, dem Dienst `api` eine zweite Domain mit internem Port **3001** zuweisen. Beispielwerte:
+In Coolify das Repository als **Docker Compose**-Anwendung mit ausschließlich `compose.yaml` einbinden. Keine Host-Port-Mappings eintragen und `compose.local.yaml` dort nicht hinzufügen. Dem Dienst `web` eine Domain mit internem Port **8080**, dem Dienst `api` eine zweite Domain mit internem Port **3001** zuweisen. Beispielwerte:
 
 ```dotenv
 API_PUBLIC_URL=https://api.deine-domain.de

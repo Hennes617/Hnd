@@ -53,3 +53,9 @@ Diese Zahlen sind zeitabhängige Prüfergebnisse, keine im Produkt festgeschrieb
 Keine vollständige Inventur aller deutschen Gewässer, keine vollständige amtliche Warnversorgung, keine eingebundenen Live-Stauinhalte und kein hydrologisch kalibriertes lokales Hochwasservorhersagemodell. Die Regenklassen sind eigene Orientierungsklassen. GloFAS-Rasterpunkte sind nicht fachlich Gewässern zugeordnet. Der recherchierte HWW-Live-Endpunkt ist ohne geklärte Weiterveröffentlichungsbedingungen bewusst nicht als freier Feed enthalten. Open-Meteos schlüsselloser Dienst unterliegt nichtkommerziellem Fair Use. Fachliche Herkunft und Bedingungen stehen in den Recherche-Dokumenten und [Wetterdaten](weather-data.md).
 
 Die zwei öffentlichen Domains werden später in Coolify eingetragen. Das Repository enthält keine erfundenen veröffentlichten URLs und keine Server-Zugangsdaten. Ein neues Cloud-Task-Restore und das spätere Coolify-Deployment wurden noch nicht geprüft.
+
+## Korrektur des Coolify-Portkonflikts
+
+Der anschließende Deploymentversuch auf dem Netcup-Server meldete einen bereits belegten Host-Port 8080; Image-Build und API-Healthcheck waren erfolgreich. `compose.yaml` veröffentlicht deshalb keine Host-Ports mehr. Nur die ausdrücklich ausgewählte `compose.local.yaml` ergänzt lokale Loopback-Bindings. Coolify verwendet weiterhin die internen Zielports 8080 und 3001.
+
+Die Konfigurationen wurden einzeln und zusammen validiert. Ein separater Compose-Start mit den vorhandenen Produktionsimages in der Cloud ergab zwei gesunde Container ohne Host-Port-Bindings. API- und Web-Healthcheck sowie `/api/v1/sources` und `/openapi.json` über den internen Web-Proxy lieferten HTTP 200. Dies prüft die korrigierte Containervernetzung; die erneute Bereitstellung auf dem Netcup-Server steht noch aus.

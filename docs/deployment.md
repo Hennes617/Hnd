@@ -15,28 +15,28 @@ Im Repository-Verzeichnis:
 
 ```bash
 cp .env.example .env
-docker compose config --quiet
-docker compose up --build -d
-docker compose ps
+docker compose -f compose.yaml -f compose.local.yaml config --quiet
+docker compose -f compose.yaml -f compose.local.yaml up --build -d
+docker compose -f compose.yaml -f compose.local.yaml ps
 curl --fail http://localhost:8080/health
 curl --fail http://localhost:3001/health
 ```
 
 Die Website ist unter `http://localhost:8080` erreichbar. API-Dokumentation und Maschinenbeschreibung liegen unter `http://localhost:3001/docs` und `http://localhost:3001/openapi.json`. Die API ist auf Port 3001 und die Website auf Port 8080 getrennt erreichbar.
 
-Die Standards sind für einen vorgeschalteten Reverse Proxy ausgelegt. `BIND_ADDRESS=127.0.0.1` verhindert eine direkte öffentliche Freigabe der Host-Ports. Ein lokaler Reverse Proxy kann diese Ports verwenden. Coolify erreicht die internen Container-Ports über sein Docker-Netzwerk. Nur wenn ein direkter Zugriff ausdrücklich gewünscht ist, `BIND_ADDRESS` auf eine geeignete Host-Adresse ändern und Firewall/TLS entsprechend konfigurieren.
+Die Basisdatei `compose.yaml` veröffentlicht keine Host-Ports. Coolify erreicht die internen Container-Ports über sein Docker-Netzwerk und benötigt die lokale Zusatzdatei nicht. Erst `compose.local.yaml` richtet für den lokalen Zugriff Host-Ports ein; `BIND_ADDRESS=127.0.0.1` begrenzt diese auf Loopback. Ein lokaler Reverse Proxy kann diese Ports ebenfalls verwenden. Bei einem lokalen Portkonflikt `WEB_PORT` oder `API_PORT` ändern; die Container-Ports bleiben immer 8080 beziehungsweise 3001.
 
 ```bash
-docker compose logs --tail=100 api web
-docker compose restart api
-docker compose down
+docker compose -f compose.yaml -f compose.local.yaml logs --tail=100 api web
+docker compose -f compose.yaml -f compose.local.yaml restart api
+docker compose -f compose.yaml -f compose.local.yaml down
 ```
 
 `down` entfernt die Container und das Compose-Netzwerk. Die Originaldaten verbleiben bei den Quellen. Logdateien werden pro Container auf drei Dateien zu jeweils 10 MB begrenzt.
 
 ## Coolify: Website und API getrennt veröffentlichen
 
-1. Ein neues Projekt beziehungsweise eine neue Ressource vom Git-Repository anlegen. Als Build-/Deployment-Typ **Docker Compose** wählen und `compose.yaml` im Repository-Root auswählen.
+1. Ein neues Projekt beziehungsweise eine neue Ressource vom Git-Repository anlegen. Als Build-/Deployment-Typ **Docker Compose** wählen und ausschließlich `compose.yaml` im Repository-Root auswählen. `compose.local.yaml` nicht hinzufügen. In Coolify keine zusätzlichen Host-Port-Mappings setzen.
 2. Beide Dienste aus der Compose-Datei übernehmen. Für `web` die öffentliche Website-Domain mit Zielport `8080` zuweisen; für `api` die öffentliche API-Domain mit Zielport `3001` zuweisen. Beispiel: `https://wasser.deine-domain.de` und `https://api.deine-domain.de`. Je nach Coolify-Version wird der interne Port im Domainfeld oder im Service-Dialog eingetragen.
 3. Die DNS-Einträge beider Namen auf den Coolify-Server richten. HTTPS-Zertifikate im Coolify-Proxy aktivieren.
 4. Folgende Variablen in den Umgebungs-/Build-Einstellungen dieser Ressource setzen:
@@ -52,13 +52,17 @@ docker compose down
 
 Die Browser-Anfragen der Website bleiben auf ihrer Website-Domain unter `/api/…`. Nginx leitet sie intern an `api:3001` weiter. Die zusätzliche API-Domain dient externen Clients und dem Link zur API-Dokumentation. Für diese Aufteilung sind weder Cross-Origin-Cookies noch vertrauliche Variablen im Frontend nötig.
 
+### Bestehender Fehler „port is already allocated“
+
+Bei `Bind for 0.0.0.0:8080 failed: port is already allocated` ist der Build bereits abgeschlossen, aber ein Host-Port wird von einem anderen Dienst verwendet. Den aktuellen Stand von `main` mit der Basisdatei `compose.yaml` neu deployen. Falls Coolify eigene Port-Mappings oder eine gespeicherte Compose-Kopie verwendet, dort die Host-Freigaben für 8080 und 3001 entfernen beziehungsweise die Datei aus Git aktualisieren. Die internen Domain-Zielports **8080** und **3001** bleiben eingetragen. Ein anderer Dienst auf dem Server muss dafür nicht gestoppt werden.
+
 ## Konfiguration
 
 | Variable | Standard | Bedeutung |
 | --- | --- | --- |
-| `WEB_PORT` | `8080` | veröffentlichter Host-Port der Website |
-| `API_PORT` | `3001` | veröffentlichter Host-Port der API |
-| `BIND_ADDRESS` | `127.0.0.1` | Bind-Adresse der Host-Ports |
+| `WEB_PORT` | `8080` | Host-Port der Website, nur mit `compose.local.yaml` |
+| `API_PORT` | `3001` | Host-Port der API, nur mit `compose.local.yaml` |
+| `BIND_ADDRESS` | `127.0.0.1` | Bind-Adresse, nur mit `compose.local.yaml` |
 | `VITE_PUBLIC_API_URL` | `http://localhost:3001` | öffentliche API-Basisadresse für Web-Links; Build-Variable |
 | `API_PUBLIC_URL` | `http://localhost:3001` | dokumentierte öffentliche API-Adresse; keine Änderung des internen Listen-Ports |
 | `CORS_ORIGIN` | `http://localhost:8080` | erlaubte Browser-Ursprünge, bei mehreren komma-getrennt |
@@ -119,7 +123,7 @@ secrets:
 
 ```bash
 PROXY_CA_FILE=/pfad/zur/proxy-ca.pem docker compose \
-  -f compose.yaml -f /pfad/zur/compose.proxy.yaml up --build -d
+  -f compose.yaml -f compose.local.yaml -f /pfad/zur/compose.proxy.yaml up --build -d
 ```
 
 Die CA bleibt außerhalb der Images. Die Proxy-Adresse muss aus dem Docker-Netzwerk erreichbar sein. Für Build-Schritte zusätzlich die Proxy-Variablen als `build.args` durchreichen. Falls der Proxy-Hostname nur im Host-Netz auflösbar ist, ihn mit der vom Betreiber bereitgestellten Adresse unter `build.extra_hosts` eintragen; den Proxy selbst weiterhin verwenden. Keine festen Cloud-Adressen in dieses Repository übernehmen. Das Deaktivieren der Zertifikatsprüfung ist keine unterstützte Konfiguration.

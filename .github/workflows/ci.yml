@@ -19,5 +19,6 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: docker compose config --quiet
+      - run: docker compose -f compose.yaml -f compose.local.yaml config --quiet
       - run: npx playwright install --with-deps chromium
       - run: HND_E2E_PRODUCTION=1 npm run test:e2e
