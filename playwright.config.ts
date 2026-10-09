@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
+const production = process.env.HND_E2E_PRODUCTION === '1';
+const baseURL = production ? 'http://127.0.0.1:4173' : 'http://127.0.0.1:5173';
 export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: true,
@@ -6,7 +8,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL,
     trace: 'retain-on-failure',
     launchOptions: {
       ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : {}),
@@ -18,6 +20,7 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
   ],
   webServer: {
-    command: 'npm run dev', url: 'http://127.0.0.1:5173', reuseExistingServer: !process.env.CI, timeout: 90_000,
+    command: production ? 'npm run preview -w @hnd/web -- --host 127.0.0.1 --port 4173 --strictPort' : 'npm run dev',
+    url: baseURL, reuseExistingServer: !production && !process.env.CI, timeout: 90_000,
   },
 });

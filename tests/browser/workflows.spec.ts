@@ -69,9 +69,12 @@ async function noHorizontalOverflow(page: Page) {
 
 test('OpenFreeMap renderer and administrative region selection work', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  // A canvas alone also exists when a missing production worker prevents all vector rendering.
+  const workerReady = page.waitForEvent('worker').then(worker => worker.evaluate(() => typeof self.postMessage));
   await mockData(page); await page.goto('/');
   await expect(page.getByRole('heading',{name:'Wasser im Blick.'})).toBeVisible();
   await expect(page.locator('.maplibregl-canvas')).toBeVisible();
+  expect(await workerReady).toBe('function');
   await expect(page.locator('.ofm-loading')).toHaveCount(0);
   await expect(page.locator('.ofm-fallback, .ofm-partial')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Sachsen-Anhalt', exact:true})).toHaveAttribute('aria-pressed','true');

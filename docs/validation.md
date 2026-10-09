@@ -45,6 +45,7 @@ Diese Zahlen sind zeitabhängige Prüfergebnisse, keine im Produkt festgeschrieb
 - Der lokale Web-Healthcheck verwendet keinen ausgehenden Proxy. HTTPS-Prüfungen zu externen Datenquellen bleiben aktiv.
 - MapLibre auf Version 6.13 aktualisiert, nachdem der Audit eine Sicherheitslücke in älteren Versionen meldete. Abschließender Laufzeit-Audit ohne gemeldete Schwachstellen.
 - Regenprognosen unterscheiden echte 0 mm von fehlenden Werten; Summen brauchen ein vollständiges Stundenfenster. Modellabrufzeit wird nicht als Modelllaufzeit ausgegeben.
+- Der abschließende Produktions-Browsertest fand einen fehlenden MapLibre-Worker im Vite-Paket. Der Worker wird jetzt explizit mit seinen Abhängigkeiten gebündelt. Die CI-Browsertests laufen gegen den Produktionsbuild und prüfen, dass der Worker tatsächlich startet; ein sichtbares Canvas allein genügt nicht.
 - Für den Cloud-Image-Build wurden die vorhandene Proxy-CA und die Auflösung des bestehenden Proxy-Hosts über einen temporären, externen Compose-Override verwendet. Keine Proxy-Zugangsdaten oder Cloud-Adressen befinden sich im Repository.
 
 ## Verbleibende Grenzen

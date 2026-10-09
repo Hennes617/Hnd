@@ -23,6 +23,7 @@ import type {
   MapMouseEvent,
 } from "maplibre-gl";
 import type { FeatureCollection, Point, LineString } from "geojson";
+import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
 
@@ -351,8 +352,10 @@ export default function WaterMap({
       if (!disposed && !styleReady) setMapState("unavailable");
     }, 18_000);
     void import("maplibre-gl")
-      .then(({ Map }) => {
+      .then(({ Map, setWorkerUrl }) => {
         if (disposed || !container.current) return;
+        // Bundle the worker and its shared imports; a relative package URL is lost in production.
+        setWorkerUrl(mapWorkerUrl);
         instance = new Map({
           container: container.current,
           style: STYLE_URL,

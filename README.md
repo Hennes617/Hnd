@@ -32,6 +32,13 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+Das tatsächlich gebaute Webpaket einschließlich Karten-Worker prüfen (wie in CI):
+
+```bash
+npm run build
+HND_E2E_PRODUCTION=1 npm run test:e2e
+```
+
 ## Docker Compose
 
 ```bash
