@@ -19,7 +19,7 @@ import {
   warningClass,
 } from "../lib/format";
 import { SourceLink, MeasurementValue, EntitySources } from "./ui";
-import { ReservoirArt } from "./ReservoirCards";
+import { ReservoirTelemetry } from "./ReservoirCards";
 import HistoryChart from "./HistoryChart";
 export default function DetailPanel({
   selection,
@@ -63,9 +63,9 @@ export default function DetailPanel({
             {REGIONS[snapshot.region].label}
           </span>
         </div>
-        <h2>Ein Blick aufs Wasser.</h2>
+        <h2>Die Region im Überblick</h2>
         <p className="panel-description">
-          Pegel, Gewässer und amtliche Informationen an einem Ort.
+          Wähle einen Pegel oder Speicher auf der Karte. Messwerte, Verlauf und Herkunft stehen hier zusammen.
         </p>
         <div className="mini-station-heading">
           <span>Pegel im Blick</span>
@@ -144,7 +144,7 @@ export default function DetailPanel({
     );
   }
   return (
-    <aside className="region-panel detail-panel">
+    <aside className="region-panel detail-panel" id="selection-detail" tabIndex={-1} aria-label={`Details zu ${entity.name}`}>
       <div className="panel-top">
         <span className="eyebrow">
           {station ? "PEGELSTATION" : river ? "FLUSSPORTRÄT" : "TALSPERRE"}
@@ -185,11 +185,11 @@ export default function DetailPanel({
               am Pegel
             </p>
           )}
-          {station.warningLabel && (
+          {station.warningLabel ? (
             <div
               className={`level-label ${warningClass(station.warningLevel)}`}
             >
-              <ShieldCheck size={16} />
+              {station.warningLevel !== undefined && station.warningLevel >= 0 ? <ShieldCheck size={16} /> : <Info size={16} />}
               <div>
                 <strong>{station.warningLabel}</strong>
                 <span>
@@ -200,14 +200,14 @@ export default function DetailPanel({
                 </span>
               </div>
             </div>
-          )}
+          ) : <div className="level-label muted"><Info size={16} /><div><strong>Keine amtliche Einstufung verfügbar</strong><span>Ein gemessener Wasserstand ist keine Entwarnung.</span></div></div>}
           {station.note && (
             <div className="station-note">
               <Info size={14} />
               <p>{station.note}</p>
             </div>
           )}
-          <HistoryChart stationId={station.id} />
+          <HistoryChart key={station.id} stationId={station.id} refreshKey={Date.parse(snapshot.generatedAt)} />
           {station.discharge && (
             <div className="discharge-detail">
               <div className="detail-row">
@@ -271,16 +271,8 @@ export default function DetailPanel({
       )}
       {reservoir && (
         <>
-          <div className="reservoir-detail-art">
-            <ReservoirArt
-              variant={snapshot.reservoirs.indexOf(reservoir) % 3}
-            />
-          </div>
+          <ReservoirTelemetry reservoir={reservoir} />
           <p className="entity-description">{reservoir.description}</p>
-          <div className="detail-row">
-            <span>Aktueller Füllstand</span>
-            <span className="small-status muted">Nicht angebunden</span>
-          </div>
           {reservoir.capacityMillionM3 !== undefined && (
             <div className="detail-row">
               <span>Kapazität bei Vollstau</span>
@@ -299,7 +291,7 @@ export default function DetailPanel({
               : reservoir.researchVerified
               ? "Quellengeprüfter Steckbrief."
               : "Redaktioneller Steckbrief, noch nicht vollständig geprüft."}{" "}
-            Keine Live-Füllstände.
+            Betriebswerte und Katalogangaben haben unterschiedliche Quellen und Bezugszeitpunkte.
           </p>
           <EntitySources
             sourceIds={reservoir.sourceIds}

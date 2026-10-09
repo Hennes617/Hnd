@@ -3,6 +3,7 @@ import type { ProviderState, Source, Station } from "@hnd/shared";
 import { formatNumber, formatDate } from "../lib/format";
 function safeLink(value: string) {
   try {
+    if (value.startsWith("/") && !value.startsWith("//")) return value;
     const url = new URL(value);
     return ["https:", "http:"].includes(url.protocol) ? url.href : "#";
   } catch {
@@ -49,13 +50,13 @@ export function MeasurementValue({
 export function ProviderBadge({ provider }: { provider: ProviderState }) {
   return (
     <span
-      className={`status-pill ${provider.state === "live" ? "success" : provider.state === "cached" ? "warning" : "muted"}`}
+      className={`status-pill ${provider.state === "live" ? "information" : provider.state === "cached" ? provider.stale ? "warning" : "information" : "muted"}`}
     >
       <i />
       {provider.state === "live"
         ? "Verbunden"
         : provider.state === "cached"
-          ? "Zwischengespeichert"
+          ? provider.stale ? "Älterer Datenstand" : "Zwischengespeichert"
           : provider.state === "reference"
             ? "Anlaufstelle"
             : "Eingeschränkt"}

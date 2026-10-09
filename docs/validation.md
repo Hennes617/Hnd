@@ -1,7 +1,36 @@
 # Prüfprotokoll
 
-Stand: 9. Oktober 2026. Prüfung in der bereitgestellten Cloud-Umgebung; noch keine Veröffentlichung auf einem Coolify-Server oder einer öffentlichen Domain.
+## Überarbeitung vom 9. Oktober 2026 – lokaler Windows-Arbeitsbaum
 
+Die folgenden Prüfungen gehören zur aktuellen Überarbeitung. Die danach dokumentierten Cloud-Prüfungen stammen vom vorherigen Stand; sie sind kein Beleg für einen neuen Containerbuild oder ein öffentlich ausgestelltes Zertifikat.
+
+- `docker compose config --quiet` und die Kombination mit `compose.local.yaml`: erfolgreich. Die Basis hat weiterhin keine Host-Portbindungen; `/data` der API erhält ein benanntes persistentes Volume.
+- OpenAPI-Tests: 3 bestanden. Spezifikation dokumentiert verfügbare Talsperren-Telemetrie, Zuordnung von Pegelmesswerten, historische Beobachtungen und strukturierte Fehler.
+- API-Dokumentation im Chromium-Renderer bei 1366 × 1000 und 390 × 844 geprüft: kein horizontaler Überlauf, alle Inhaltsanker lösen auf. Desktop- und Mobilansicht visuell kontrolliert. Systemschriften, lokale Styles, keine externen Skripte.
+- Docker-CLI vorhanden, Linux-Daemon dieser Windows-Umgebung nicht erreichbar (`dockerDesktopLinuxEngine` fehlt). Ein erneuter Image-Build, `nginx -t` im Image, Containerstart und Datenvolume-Neustarttest sind hierdurch **nicht** nachgewiesen.
+- Keine verifizierte öffentliche Domain und kein bestätigter Coolify-/DNS-Zugriff im Repository. HTTPS-Zertifikatsausstellung bleibt ungeprüft; konkrete, mit aktueller offizieller Coolify-Dokumentation belegte Restschritte stehen in [Betrieb und HTTPS-Fehlersuche](deployment.md).
+
+Abschließende Gesamtprüfung am 9. Oktober 2026:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| TypeScript API und Website | erfolgreich |
+| API-, Adapter-, Identitäts-, Cache- und SQLite-Tests | **91 bestanden**, keine übersprungen |
+| Produktionsbuild API und Website | erfolgreich |
+| Start des gebauten API-Pakets mit SQLite (`npm run test:production-api`) | erfolgreich; `/health` und `/docs` antworten; in CI ergänzt |
+| Produktions-Browserworkflows, Desktop und iPhone-Viewport | **20 bestanden**, einschließlich Quellen-Teilausfall, Messwert 0, Einzelpunkt, Auswahlrennen und Retry |
+| Laufzeit-Abhängigkeiten (`npm audit --omit=dev`) | keine gemeldeten Schwachstellen |
+| `git diff --check` | erfolgreich |
+
+Der Produktionsstart fand und behob zusätzlich einen Bundlerfehler: `node:sqlite` darf nicht zum nicht existierenden npm-Import `sqlite` umgeschrieben werden. Der Starttest prüft deshalb ausdrücklich das gebaute API-Artefakt. Die SQLite-Tests decken automatische Initialisierung, Neustart mit dauerhaft erhaltenen Beobachtungen, Original-Cachezeitpunkte, Deduplizierung und Aufbewahrungsfristen ab. Die Persistenz benötigt kein Nachbilden fehlender Messungen. Vitest wurde zur Beseitigung kritischer Entwicklungsabhängigkeiten aktualisiert; der vollständige Audit meldet weiterhin einen niedrigen, ausschließlich die Entwicklungs-/Build-Abhängigkeit esbuild betreffenden Hinweis.
+
+Zusätzlicher echter Live-Test des gebauten API-Pakets und der gebauten Website über einen lokalen Vite-Preview-Proxy: Desktop 1440 × 1000 und Mobil 390 × 844, echte OpenFreeMap-Kacheln und aktuelle Betreiberantworten; keine JavaScript-Fehler oder horizontalen Überläufe. Hauptseite, Talsperrenansicht, mobile Betriebsdaten und API-Dokumentation wurden als Screenshots visuell geprüft. Dies ist ausdrücklich kein Nginx-/Container-Lauftest.
+
+Liveabruf des Produktionspakets um **14:27 Uhr MESZ**: 18 Speicher, davon **17 mit mindestens einem Betreiberparameter** und **16 mit Beckeninhalt**. Kelbra hatte nur Zufluss, Oderteich keine angebundene Reihe. Poppenburg (`NI_4885154`) lieferte **672**, Thale (`ST_579020`) **632** echte Verlaufspunkte. Die SQLite-Instanz enthielt bereits über **88.000** echte Beobachtungen. PEGELONLINE antwortete in dieser Stichprobe nicht rechtzeitig; auch der direkte Originalabruf überschritt 15 Sekunden. Die frisch gestartete Instanz ohne vorherigen WSV-Cache zeigte deshalb 1.711 Standorte mit 245 numerischen Wasserständen und explizitem Quellenhinweis. Frühere erfolgreiche WSV-Abgleiche und ihre zeitabhängigen Zahlen sind in der [Quellenprüfung](data-research-2026-10-09.md) festgehalten. Nationale Messwertabdeckung bleibt unvollständig; diese Ausfälle werden nicht als Entwarnung dargestellt.
+
+## Frühere Cloud-Prüfung – historischer Stand vor dieser Überarbeitung
+
+Die nachstehenden Zahlen und Aussagen beschreiben den damaligen Stand, einschließlich damaliger Funktionsgrenzen. Insbesondere „keine Live-Stauinhalte“ beschreibt die frühere Implementierung.
 ## Ausgeführt
 
 | Prüfung | Ergebnis |

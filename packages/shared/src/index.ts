@@ -8,6 +8,10 @@ export interface Station {
   measurement: Measurement | null; discharge: Measurement | null;
   freshness: 'current' | 'stale' | 'unavailable';
   note?: string;
+  /** Upstream identity used for water-level histories, never a geographic guess. */
+  measurementSourceId?: string;
+  sourceStationNumber?: string;
+  historyAvailable?: boolean;
   warningLevel?: number; warningLabel?: string; warningSource?: string; warningTimestamp?: string;
 }
 export interface FloodWarning {

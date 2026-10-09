@@ -27,7 +27,7 @@ describe("live data orchestration", () => {
     ).toBe("reference");
     expect(snapshot.coverage.complete).toBe(false);
     await service.overview("harz");
-    expect(fetchJson).toHaveBeenCalledTimes(4); // Cache/backoff prevents hammering failed sources.
+    expect(fetchJson).toHaveBeenCalledTimes(12); // Five gauge/warning feeds and seven reservoir requests; backoff prevents repeats.
   });
   it("filters historical fallback coordinates by actual administrative boundaries", async () => {
     const service = createDataService(

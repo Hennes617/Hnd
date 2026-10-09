@@ -18,6 +18,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run test:production-api
       - run: docker compose config --quiet
       - run: docker compose -f compose.yaml -f compose.local.yaml config --quiet
       - run: npx playwright install --with-deps chromium

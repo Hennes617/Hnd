@@ -48,10 +48,14 @@ const array = (items: unknown) => ({ type: "array", items });
 const str = { type: "string" };
 const num = { type: "number" };
 const errors = {
-  "400": { description: "Ungültige Parameter" },
-  "404": { description: "Standort oder Zeitreihe nicht verfügbar" },
-  "429": { description: "Ratenlimit überschritten (120/min)" },
-  "500": { description: "Interner Fehler" },
+  "400": { ...json(ref("Error")), description: "Ungültige Parameter (INVALID_REQUEST)." },
+  "404": { ...json(ref("Error")), description: "Endpunkt oder Standort unbekannt. Bekannte Pegel ohne Beobachtungen liefern eine leere Zeitreihe mit HTTP 200." },
+  "429": {
+    ...json(ref("Error")),
+    description: "Ratenlimit überschritten (120/min und Quell-IP). Zeitversetzt erneut versuchen.",
+    headers: { "Retry-After": { description: "Sekunden bis zu einem erneuten Versuch", schema: { type: "integer" } } },
+  },
+  "500": { ...json(ref("Error")), description: "Interner Fehler (INTERNAL_ERROR)." },
 };
 export const openapi = {
   openapi: "3.1.0",
@@ -74,7 +78,15 @@ export const openapi = {
         summary: "API Liveness (keine Upstream-Readiness)",
         responses: {
           "200": json(
-            object({ status: { const: "ok" }, service: str, uptime: num }),
+            object({
+              status: { const: "ok" }, service: str, uptime: num,
+              storage: object({
+                kind: { const: "sqlite" },
+                schemaVersion: { type: "integer" },
+                observations: { type: "integer", description: "Anzahl gespeicherter Beobachtungen; keine Aussage über aktuelle Quellenverfügbarkeit." },
+                lastObservationAt: { type: ["string", "null"], format: "date-time" },
+              }),
+            }),
           ),
         },
       },
@@ -119,7 +131,8 @@ export const openapi = {
     },
     "/api/v1/stations/{id}/history": {
       get: {
-        summary: "Wasserstandsreihe der letzten sieben verfügbaren Tage",
+        summary: "Verfügbare Wasserstandsreihe und lokal gesammelte Beobachtungen",
+        description: "Originalzeitreihe, soweit integriert, ergänzt um echte lokal gespeicherte Beobachtungen. Umfang hängt von Quelle und Betriebsdauer ab; keine künstliche Historie. Bekannte Pegel ohne Beobachtungen liefern HTTP 200, measurements: [] und provider.state: unavailable. Nur unbekannte Pegel liefern HTTP 404. Zeitstempel, Einheiten und Providerzustand beachten.",
         parameters: [idParameter],
         responses: {
           "200": json(
@@ -171,10 +184,12 @@ export const openapi = {
     "/api/v1/reservoirs": {
       get: {
         summary:
-          "Regional gefilterte Talsperren und Speicher; keine Live-Stauinhalte",
+          "Regional gefilterte Talsperren mit verfügbaren Betreiber-Messwerten",
+        description: "telemetry enthält ausschließlich tatsächlich verfügbare Betriebsdaten. Bauliche capacityMillionM3 und aktueller Stauinhalt sind unterschiedliche Größen. Fehlende Felder bedeuten unbekannte Werte, nicht null Kubikmeter oder Entwarnung.",
         parameters: [regionParameter],
         responses: {
-          "200": json(object({ reservoirs: array(ref("Reservoir")) })),
+          "200": json(object({ reservoirs: array(ref("Reservoir")), providers: array(ref("ProviderState")), generatedAt: { type: "string", format: "date-time" } })),
+          ...errors,
         },
       },
     },
@@ -295,6 +310,9 @@ export const openapi = {
           warningLabel: str,
           warningSource: str,
           warningTimestamp: str,
+          historyAvailable: { type: "boolean", description: "Eine integrierte Originalreihe oder echte lokal gespeicherte Beobachtungen sind verfügbar." },
+          measurementSourceId: { type: "string", description: "Quellstations-ID für den zugeordneten Messwert und seine Originalzeitreihe, z. B. eine PEGELONLINE-UUID; nicht automatisch Quelle der Warnklasse." },
+          sourceStationNumber: { type: "string", description: "Unveränderte Original-Pegelnummer der Quelle." },
         },
         [
           "id",
@@ -378,7 +396,20 @@ export const openapi = {
         sourceIds: array(str),
         description: str,
         geometryAccuracy: { const: "approximate" },
+        telemetry: ref("ReservoirTelemetry"),
       }),
+      ReservoirTelemetry: object({
+        storage: { ...ref("Measurement"), description: "Beobachteter Stauinhalt in Mio. m³; keine bauliche Kapazität." },
+        level: { ...ref("Measurement"), description: "Beobachteter Wasserstand in der Originaleinheit der Betreiberquelle." },
+        inflow: { ...ref("Measurement"), description: "Zufluss in m³/s." },
+        outflow: { ...ref("Measurement"), description: "Abgabe in m³/s." },
+        fillPercent: { ...ref("Measurement"), description: "Füllanteil in %, nur bei belegter Bezugsgröße; keine Hochwasserklasse." },
+        freshness: { type: "string", enum: ["current", "stale", "unavailable"] },
+        sourceUrl: { type: "string", format: "uri" },
+        sourceName: str,
+        note: str,
+      }, ["freshness", "sourceUrl", "sourceName"]),
+      Error: object({ error: object({ code: str, message: str }, ["code", "message"]) }, ["error"]),
       Source: object({
         id: str,
         name: str,

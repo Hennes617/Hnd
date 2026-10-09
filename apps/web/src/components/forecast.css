@@ -112,9 +112,6 @@
 .forecast-notice { display: flex; align-items: flex-start; gap: 8px; padding: 13px 16px; margin-bottom: 17px; border: 1px solid #e5dbc4; border-radius: 7px; background: #f7f3e8; color: #907946; font-size: 11px; line-height: 1.7; }
 .forecast-notice > svg { flex-shrink: 0; margin-top: 2px; }
 @media (max-width: 1250px) {
-  .page-heading { align-items: flex-start; }
-  .page-heading .heading-controls { padding-top: 0; }
-  .page-heading .region-switch > button { padding: 9px 10px; font-size: 9px; }
   .forecast-preview { flex-wrap: wrap; gap: 19px 28px; }
   .forecast-preview-title { flex-basis: 40%; }
   .forecast-preview-metric { flex-basis: 45%; justify-content: flex-end; }
@@ -128,9 +125,6 @@
   .forecast-source > span { margin: 6px 0 0; flex-basis: 100%; }
 }
 @media (max-width: 1000px) {
-  .page-heading .heading-controls { padding-top: 0; }
-  .page-heading .region-switch { padding: 3px; }
-  .page-heading .region-switch > button { font-size: 8px; padding: 9px 8px; }
   .forecast-grid { grid-template-columns: minmax(0, 1fr); }
   .rain-forecast-heading { flex-direction: row; }
   .rainfall-assessment { flex-direction: row; align-items: center; }
@@ -142,8 +136,6 @@
   .forecast-section .forecast-river-title h2 { font-size: 27px; }
 }
 @media (max-width: 760px) {
-  .page-heading .heading-controls { width: 100%; flex-direction: column; align-items: flex-start; padding-top: 0; gap: 11px; }
-  .page-heading .region-switch > button { font-size: 10px; padding: 10px 12px; }
   .forecast-preview { padding: 22px; }
   .forecast-preview h2 { font-size: 25px; }
   .forecast-preview-metric > strong { font-size: 31px; }
@@ -169,8 +161,6 @@
   .forecast-empty > button { margin-left: 40px; }
 }
 @media (max-width: 520px) {
-  .page-heading .region-switch { width: 100%; padding: 4px; }
-  .page-heading .region-switch > button { flex: 1; font-size: 9px; padding: 11px 5px; }
   .forecast-preview { gap: 19px 12px; padding: 21px; }
   .forecast-preview-title { flex-basis: 100%; }
   .forecast-preview-title p { font-size: 10px; }

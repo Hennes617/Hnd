@@ -9,6 +9,9 @@ const ALLOWED_HOSTS = new Set([
   "warnung.bund.de",
   "hvz.lsaurl.de",
   "www.pegelonline.nlwkn.niedersachsen.de",
+  "www.talsperrenbetrieb.de",
+  "www.harzwasserwerke.de",
+  "bis.azure-api.net",
 ]);
 export function createFetcher(timeoutMs: number): FetchJson {
   // Honour managed-cloud proxy and CA trust; never disable certificate validation.

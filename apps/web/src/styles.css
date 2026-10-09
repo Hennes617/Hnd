@@ -2586,11 +2586,6 @@ h1 {
   .content-section > .reservoir-grid > .reservoir-card:nth-child(3) {
     grid-column: auto;
   }
-  .content-section:not(.directory-section)
-    > .reservoir-grid
-    > .reservoir-card:nth-child(3) {
-    display: none;
-  }
   .reservoir-image {
     height: 135px;
   }
