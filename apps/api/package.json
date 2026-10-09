@@ -1,0 +1,26 @@
+{
+  "name": "@hnd/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@hnd/shared": "1.0.0",
+    "fastify": "^5.6.1",
+    "undici": "^7.16.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "tsup": "^8.5.0",
+    "vitest": "^3.2.4"
+  }
+}
